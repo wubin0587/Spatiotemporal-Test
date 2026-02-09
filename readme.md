@@ -186,3 +186,55 @@ $$ E = \{ p_e, t_e, S_{max}, \vec{\theta}_e, \Omega_e \} $$
 > "Events in our simulation are modeled not merely as scalar noise, but as **high-dimensional spatiotemporal vectors**. Each event is characterized by its **intensity profile** (governed by a heavy-tailed distribution), its **semantic embedding** (targeting specific layers of the interest network), and its **controversy index** (determining the likelihood of backfire effects). The temporal evolution of an event follows a **log-normal attention curve**, mimicking empirical observations of social media trends. This granular formulation allows us to distinguish between 'consensus-building shocks' (e.g., natural disasters) and 'polarizing triggers' (e.g., political scandals)."
 
 **(我们的事件不仅是标量噪声，而是高维时空向量。每个事件由强度分布（重尾）、语义嵌入（针对特定兴趣层）和争议指数（决定逆火效应）定义。其时间演化遵循对数正态注意力曲线，模拟了社交媒体趋势的实证观察。这种细粒度的公式化使我们能够区分“共识建立型冲击”和“极化触发型冲击”。)**
+
+
+### 一、 数学方案 (Mathematical Scheme)
+
+为了支持大规模仿真（$N > 10,000$），所有计算必须向量化。我们将核心逻辑抽象为三个矩阵运算步骤：**场计算**、**拓扑加权**、**动力学更新**。
+
+#### 1. 冲击场计算 (Field Intensity Calculation)
+这是驱动系统演化的“能源”。我们需要计算时刻 $t$，每个智能体 $i$ 受到的时空综合冲击值 $I_i(t)$。
+
+*   **输入:**
+    *   智能体位置矩阵 $\mathbf{P} \in \mathbb{R}^{N \times 2}$
+    *   当前活跃事件集 $\mathcal{E}_t$（从 `events` 模块获取），包含位置 $\mathbf{L}_E$、时间 $\mathbf{T}_E$、强度 $\mathbf{S}_E$。
+*   **公式:**
+    对于每个智能体 $i$：
+    $$ I_i(t) = \sum_{k \in \mathcal{E}_t} S_k \cdot \underbrace{\exp\left(-\frac{\|\mathbf{p}_i - \mathbf{l}_k\|^2}{2\sigma^2}\right)}_{\text{Spatial Kernel}} \cdot \underbrace{\mathcal{T}(t - t_k)}_{\text{Temporal Kernel}} $$
+*   **向量化实现提示:**
+    不要用循环。利用广播（Broadcasting）计算 $N \times M$ 的距离矩阵（$M$ 为活跃事件数），直接对行求和得到 $N \times 1$ 的向量 $\mathbf{I}(t)$。
+
+#### 2. 双模态邻居加权 (Dual-Mode Neighbor Weighting)
+这是实现“算法 vs. 现实”冲突的核心数学表达。我们定义两个邻接矩阵，并通过冲击值 $I_i(t)$ 进行动态线性插值。
+
+*   **变量定义:**
+    *   $\mathbf{A}_{algo}$: **算法邻接矩阵**（静态或基于同质性更新）。代表“线上关注/推荐”。
+    *   $\mathbf{A}_{phy}$: **物理邻接矩阵**（动态，基于 KD-Tree）。代表“线下附近的陌生人”。
+    *   $\mathbf{\Omega}(t)$: **注意力权重向量** $\in \mathbb{R}^{N}$。
+
+*   **激活函数 (Sigmoid Activation):**
+    将冲击值映射为“关注现实”的概率：
+    $$ \omega_i(t) = \frac{1}{1 + e^{-k(I_i(t) - \tau)}} $$
+    *   $\tau$: 激活阈值。当 $I_i < \tau$，$\omega_i \to 0$（沉浸算法）；当 $I_i > \tau$，$\omega_i \to 1$（关注现实）。
+
+*   **综合交互矩阵 (Effective Interaction Matrix):**
+    对于智能体 $i$，其交互对象池的采样概率分布由下式决定：
+    $$ \mathbf{P}_{interaction} = (1 - \omega_i(t)) \cdot \mathbf{A}_{algo}[i] + \omega_i(t) \cdot \mathbf{A}_{phy}[i] $$
+    *   *含义*: 危机越重，物理邻居的权重越高，算法推荐的权重越低。
+
+#### 3. 参数调制与状态更新 (Modulated Dynamics)
+基于有界信任（Bounded Confidence），但引入非线性调制。
+
+*   **信任阈值调制 (Trust Modulation):**
+    $$ \epsilon_{eff}^{(i)}(t) = \epsilon_{base} \cdot (1 + \alpha \cdot I_i(t)) $$
+    *   *逻辑*: 冲击越大，信息接收窗口越宽（恐慌性信息摄入）。如果需要模拟“逆火效应”，则引入 $\text{Polarity}$ 因子修正此项。
+
+*   **学习率调制 (Learning Rate Modulation):**
+    $$ \mu_{eff}^{(i)}(t) = \mu_{base} \cdot (1 + \beta \cdot I_i(t)) $$
+    *   *逻辑*: 冲击越大，观点改变速度越快。
+
+*   **更新规则 (Update Rule):**
+    选定邻居 $j$ 后，若 $|\mathbf{x}_i - \mathbf{x}_j| < \epsilon_{eff}^{(i)}$：
+    $$ \mathbf{x}_i(t+1) = \mathbf{x}_i(t) + \mu_{eff}^{(i)} \cdot (\mathbf{x}_j(t) - \mathbf{x}_i(t)) $$
+
+---

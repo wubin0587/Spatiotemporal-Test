@@ -183,7 +183,8 @@ class EndogenousThresholdGenerator(EventGenerator):
                         'agents': agents_in_cell,
                         'metric_value': metric_value,
                         'opinions': opinions[agents_in_cell] if len(agents_in_cell) > 0 else None
-                    }
+                    },
+                    agent_positions=positions  # Pass full position matrix
                 )
                 
                 triggered_events.append(new_event)
@@ -302,24 +303,33 @@ class EndogenousThresholdGenerator(EventGenerator):
     
     def _create_event(self, t: float, 
                      trigger_location: Tuple[float, float],
-                     cell_data: Dict) -> Event:
+                     cell_data: Dict,
+                     agent_positions: np.ndarray) -> Event:
         """
         Create an Event object based on the triggering cell's state.
         
         Args:
             t: Current time
-            trigger_location: (x, y) coordinates of the cell center
+            trigger_location: (x, y) coordinates of the cell center (fallback)
             cell_data: Dictionary containing:
                       - 'agents': List of agent indices in the cell
                       - 'metric_value': The metric that exceeded threshold
                       - 'opinions': Opinion matrix subset for these agents
+            agent_positions: Full position matrix (N, 2) to calculate true centroid
         
         Returns:
             Event: Newly created event
         """
         # --- L: Location ---
-        # Use the cell center as the event epicenter
-        loc = np.array(trigger_location)
+        # Calculate TRUE centroid of agents in cell (not mechanical grid center)
+        # This preserves the "epicenter" micro-offset within the grid
+        agents_in_cell = cell_data['agents']
+        if len(agents_in_cell) > 0:
+            # Physical center of mass of the crowd
+            loc = np.mean(agent_positions[agents_in_cell], axis=0)
+        else:
+            # Fallback: use grid center if no agents (shouldn't happen)
+            loc = np.array(trigger_location)
         
         # --- I: Intensity ---
         # Intensity is proportional to how much the threshold was exceeded
@@ -372,12 +382,18 @@ class EndogenousThresholdGenerator(EventGenerator):
         if pol_conf.get('type') == 'constant':
             polarity = pol_conf.get('value', 0.0)
         
-        # --- Spatial Dynamics ---
+        # --- Spatial Dynamics (CRITICAL FIX) ---
+        # DO NOT randomly sample - derive from actual crowd distribution!
+        # This is the dialectic between online (sparse -> wide sigma) 
+        # and offline (dense -> local sigma)
         diff_conf = self.attr_config.get('diffusion', {})
-        spatial_params = spatial_dist.sample_diffusion_params(
-            self.rng,
-            diff_conf.get('type', 'uniform'),
-            diff_conf
+        
+        # Calculate spatial spread based on agent distribution
+        spatial_params = self._calculate_spatial_params_from_crowd(
+            agents_in_cell=agents_in_cell,
+            agent_positions=agent_positions,
+            event_location=loc,
+            config=diff_conf
         )
         
         # --- Temporal Dynamics ---
@@ -406,6 +422,80 @@ class EndogenousThresholdGenerator(EventGenerator):
                 'num_agents_in_cell': len(cell_data['agents'])
             }
         )
+    
+    def _calculate_spatial_params_from_crowd(self, 
+                                            agents_in_cell: List[int],
+                                            agent_positions: np.ndarray,
+                                            event_location: np.ndarray,
+                                            config: Dict) -> Dict[str, float]:
+        """
+        Calculate spatial diffusion parameters based on ACTUAL crowd distribution,
+        not random sampling. This implements the dialectic:
+        
+        Dense offline crowd -> Small sigma (local event, e.g. protest)
+        Sparse online crowd -> Large sigma (viral spread, e.g. hashtag)
+        
+        Physics:
+        1. Calculate spatial variance of the crowd (how spread out they are)
+        2. If variance is LOW (tight cluster) -> Event is OFFLINE (small sigma)
+        3. If variance is HIGH (distributed) -> Event is ONLINE (large sigma)
+        
+        Args:
+            agents_in_cell: List of agent indices involved
+            agent_positions: Full position matrix (N, 2)
+            event_location: Event epicenter (centroid)
+            config: Configuration parameters for bounds
+        
+        Returns:
+            Dict with 'sigma' key
+        """
+        if len(agents_in_cell) == 0:
+            # Fallback: default parameters
+            return {'sigma': config.get('default_sigma', 0.1)}
+        
+        # Extract positions of involved agents
+        crowd_positions = agent_positions[agents_in_cell]
+        
+        # Calculate spatial variance (how spread out the crowd is)
+        # This is the KEY INSIGHT: variance measures "online vs offline"
+        distances_from_epicenter = np.linalg.norm(
+            crowd_positions - event_location, 
+            axis=1
+        )
+        spatial_variance = np.var(distances_from_epicenter)
+        
+        # Map variance to sigma using inverse relationship
+        # High variance (spread out) -> Large sigma (online, wide impact)
+        # Low variance (clustered) -> Small sigma (offline, local impact)
+        
+        # Get bounds from config
+        min_sigma = config.get('min_sigma', 0.03)  # Offline: very local
+        max_sigma = config.get('max_sigma', 0.3)   # Online: city-wide
+        
+        # Calibration: typical variance ranges
+        # Tight cluster: variance ~ 0.0001 (radius ~0.01)
+        # Spread crowd: variance ~ 0.01 (radius ~0.1)
+        var_min = config.get('var_min', 0.0001)
+        var_max = config.get('var_max', 0.01)
+        
+        # Linear mapping: variance -> sigma
+        # Clamp to avoid extremes
+        variance_ratio = (spatial_variance - var_min) / (var_max - var_min)
+        variance_ratio = np.clip(variance_ratio, 0.0, 1.0)
+        
+        sigma = min_sigma + variance_ratio * (max_sigma - min_sigma)
+        
+        # Additional factor: crowd size
+        # Larger crowds tend to have more "momentum" -> wider spread
+        # But diminishing returns (log scale)
+        size_factor = config.get('size_factor', 0.05)
+        crowd_size = len(agents_in_cell)
+        size_bonus = size_factor * np.log1p(crowd_size / 10.0)
+        
+        sigma = sigma + size_bonus
+        sigma = np.clip(sigma, min_sigma, max_sigma)
+        
+        return {'sigma': float(sigma)}
     
     def reset_cooldowns(self):
         """

@@ -51,13 +51,14 @@ def test_centroid_calculation():
     N = 100
     L = 3
     
-    positions = np.random.uniform(0, 1, size=(N, 2))
-    opinions = np.random.uniform(0, 1, size=(N, L))
+    rng = np.random.default_rng(100)
+    positions = rng.uniform(0, 1, size=(N, 2))
+    opinions = np.clip(0.5 + rng.normal(0, 0.01, size=(N, L)), 0, 1)
     
     # Put 10 agents with extreme opinions in corner of cell (2,2)
     cluster_agents = list(range(10))
-    positions[cluster_agents] = np.random.normal([0.21, 0.21], 0.005, size=(10, 2))
-    opinions[cluster_agents] = np.random.normal(0.9, 0.02, size=(10, L))  # Extreme
+    positions[cluster_agents] = rng.normal([0.21, 0.21], 0.004, size=(10, 2))
+    opinions[cluster_agents] = np.clip(rng.normal(0.95, 0.01, size=(10, L)), 0, 1)  # Extreme
     opinions = np.clip(opinions, 0, 1)
     
     agents_state = {'positions': positions, 'opinions': opinions}
@@ -91,7 +92,7 @@ def test_centroid_calculation():
         
         print(f"\n✓ PASS: Event location uses true centroid (not grid center)")
     else:
-        print("\n⚠ No events generated. Adjust threshold or agent distribution.")
+        raise AssertionError('No events generated in deterministic centroid scenario')
     
     print()
     return True
@@ -134,23 +135,26 @@ def test_physics_based_sigma():
     N = 100
     L = 3
     
-    positions_tight = np.random.uniform(0, 1, size=(N, 2))
-    opinions_tight = np.random.uniform(0, 1, size=(N, L))
+    rng = np.random.default_rng(200)
+    positions_tight = rng.uniform(0, 1, size=(N, 2))
+    opinions_tight = np.clip(0.5 + rng.normal(0, 0.01, size=(N, L)), 0, 1)
     
     # Create tight cluster at (0.5, 0.5) with variance ~0.0002
     cluster_size = 20
-    cluster_center = [0.5, 0.5]
-    cluster_std = 0.015  # Very tight
+    cluster_center = np.array([0.45, 0.45])
+    cluster_std = 0.005  # Very tight and concentrated in one cell
     
-    positions_tight[:cluster_size] = np.random.normal(cluster_center, cluster_std, size=(cluster_size, 2))
-    opinions_tight[:cluster_size] = np.random.normal(0.9, 0.02, size=(cluster_size, L))
+    positions_tight[:cluster_size] = rng.normal(cluster_center, cluster_std, size=(cluster_size, 2))
+    opinions_tight[:cluster_size] = np.clip(rng.normal(0.95, 0.01, size=(cluster_size, L)), 0, 1)
     opinions_tight = np.clip(opinions_tight, 0, 1)
     
     agents_state_tight = {'positions': positions_tight, 'opinions': opinions_tight}
     
     events_tight = gen.step(current_time=10.0, agents_state=agents_state_tight)
     
-    if len(events_tight) > 0:
+    if len(events_tight) == 0:
+        raise AssertionError('No events generated for tight-cluster sigma scenario')
+    else:
         sigma_tight = events_tight[0].spatial_params['sigma']
         actual_variance = np.var(np.linalg.norm(
             positions_tight[:cluster_size] - cluster_center, axis=1
@@ -167,24 +171,25 @@ def test_physics_based_sigma():
     print("\n--- Scenario B: Distributed Online Crowd ---")
     gen.reset_cooldowns()  # Reset for new test
     
-    positions_spread = np.random.uniform(0, 1, size=(N, 2))
-    opinions_spread = np.random.uniform(0, 1, size=(N, L))
+    positions_spread = rng.uniform(0, 1, size=(N, 2))
+    opinions_spread = np.clip(0.5 + rng.normal(0, 0.01, size=(N, L)), 0, 1)
     
     # Create distributed cluster across wide area with variance ~0.008
     spread_agents = 25
-    spread_center = [0.5, 0.5]
-    spread_std = 0.12  # Much wider
+    spread_center = np.array([0.45, 0.45])
+    spread_std = 0.02  # Wider than tight cluster but still in one cell
     
-    positions_spread[:spread_agents] = np.random.normal(spread_center, spread_std, size=(spread_agents, 2))
-    positions_spread[:spread_agents] = np.clip(positions_spread[:spread_agents], 0, 1)
-    opinions_spread[:spread_agents] = np.random.normal(0.9, 0.02, size=(spread_agents, L))
+    positions_spread[:spread_agents] = np.clip(rng.normal(spread_center, spread_std, size=(spread_agents, 2)), 0, 1)
+    opinions_spread[:spread_agents] = np.clip(rng.normal(0.95, 0.01, size=(spread_agents, L)), 0, 1)
     opinions_spread = np.clip(opinions_spread, 0, 1)
     
     agents_state_spread = {'positions': positions_spread, 'opinions': opinions_spread}
     
     events_spread = gen.step(current_time=30.0, agents_state=agents_state_spread)
     
-    if len(events_spread) > 0:
+    if len(events_spread) == 0:
+        raise AssertionError('No events generated for spread-cluster sigma scenario')
+    else:
         sigma_spread = events_spread[0].spatial_params['sigma']
         actual_variance = np.var(np.linalg.norm(
             positions_spread[:spread_agents] - spread_center, axis=1

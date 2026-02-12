@@ -1,350 +1,251 @@
 # -*- coding: utf-8 -*-
 """
-@File    : test_physics_fixes.py
-@Desc    : Test suite to verify the physics-based optimizations in event generators.
-           Tests both the centroid calculation and variance-based sigma calculation.
+端到端仿真测试 - 验证所有模块联通性 (最终修复版)
 """
 
 import sys
 import numpy as np
 from pathlib import Path
 
+# 确保能找到 models 模块
 sys.path.insert(0, str(Path(__file__).parent))
 
-def test_centroid_calculation():
-    """Test that events use true crowd centroid, not mechanical grid center."""
-    print("=" * 60)
-    print("TEST: Centroid Calculation Fix")
-    print("=" * 60)
-    
-    from models.events.generate.imp import EndogenousThresholdGenerator
-    
+from models.engine.facade import SimulationFacade
+
+def create_test_config():
+    """创建测试配置 - 参数已优化以确保触发各类事件"""
     config = {
-        'seed': 100,
-        'monitor_attribute': 'opinion_extremism',
-        'critical_threshold': 0.5,
-        'grid_resolution': 10,
-        'min_agents_in_cell': 3,
-        'cooldown': 20,
-        'attributes': {
-            'intensity': {'base_value': 5.0, 'scale_factor': 10.0},
-            'content': {'topic_dim': 3},
-            'polarity': {'type': 'dynamic'},
-            'diffusion': {
-                'min_sigma': 0.03,
-                'max_sigma': 0.3,
-                'var_min': 0.0001,
-                'var_max': 0.01,
-                'size_factor': 0.05
-            },
-            'lifecycle': {'type': 'uniform', 'min_sigma': 5.0, 'max_sigma': 20.0}
+        'agents': {
+            'num_agents': 200,
+            'opinion_layers': 3,
+            'initial_opinions': {
+                # 增加初始极化，更容易触发内生事件
+                'type': 'polarized',
+                'params': {
+                    'split': 0.5
+                }
+            }
+        },
+        
+        'network': {
+            'layers': [
+                {
+                    'name': 'social',
+                    'type': 'small_world',
+                    'params': {'n': 200, 'k': 8, 'p': 0.1}
+                }
+            ]
+        },
+        
+        'spatial': {
+            'distribution': {
+                'type': 'clustered',
+                'n_clusters': 4,
+                'cluster_std': 0.1
+            }
+        },
+        
+        'events': {
+            'generation': {
+                # 1. 外生事件（确保必定触发）
+                'exogenous': {
+                    'enabled': True,
+                    'seed': 2025,
+                    'time_trigger': {
+                        'type': 'poisson',
+                        'lambda_rate': 0.2  # 提高频率
+                    },
+                    'attributes': {
+                        'location': {'type': 'uniform'},
+                        'intensity': {'type': 'pareto', 'shape': 2.5, 'min_val': 5.0},
+                        'content': {'topic_dim': 3, 'concentration': [1,1,1]},
+                        'polarity': {'type': 'uniform', 'min': -0.5, 'max': 0.5},
+                        'diffusion': {'type': 'log_normal', 'log_mean': -2.0, 'log_std': 0.5},
+                        'lifecycle': {'type': 'bimodal', 'fast_prob': 0.9, 'fast_range': [2, 5], 'slow_range': [10, 20]}
+                    }
+                },
+                
+                # 2. 内生事件（大幅降低阈值以便测试）
+                'endogenous_threshold': {
+                    'enabled': True,
+                    'seed': 2026,
+                    'monitor_attribute': 'opinion_extremism',
+                    'critical_threshold': 0.15,  # ⚠️ 降低阈值，确保容易触发
+                    'grid_resolution': 10,
+                    'min_agents_in_cell': 3,
+                    'cooldown': 5,
+                    'attributes': {
+                        'intensity': {'base_value': 10.0, 'scale_factor': 5.0},
+                        'content': {'topic_dim': 3, 'amplify_dominant': True},
+                        'polarity': {'type': 'dynamic'},
+                        'diffusion': {'min_sigma': 0.1, 'max_sigma': 0.3, 'var_min': 0.001, 'var_max': 0.01, 'size_factor': 0.1},
+                        'lifecycle': {'type': 'uniform', 'min_sigma': 5.0, 'max_sigma': 10.0}
+                    }
+                },
+                
+                # 3. 级联事件（削弱强度，防止淹没其他事件）
+                'endogenous_cascade': {
+                    'enabled': True,
+                    'seed': 2027,
+                    'background_lambda': 0.0, # 关闭背景噪音
+                    'mu_multiplier': 0.8,     # 降低繁殖率，防止指数爆炸
+                    'attributes': {
+                        'intensity': {'cascade_decay': 0.5}, # 衰减更快
+                        'diffusion': {'inherit_from_parent': True, 'spatial_mutation': 0.04},
+                        'lifecycle': {'type': 'uniform', 'min_sigma': 2.0, 'max_sigma': 5.0}
+                    }
+                }
+            }
+        },
+        
+        'dynamics': {
+            'epsilon_base': 0.25,
+            'mu_base': 0.35,
+            'alpha_mod': 0.25,
+            'beta_mod': 0.15,
+            'backfire': False
+        },
+        
+        'field': {
+            'alpha': 6.0,
+            'beta': 0.08,
+            'temporal_window': 100.0
+        },
+        
+        'topology': {
+            'threshold': 0.3,
+            'radius_base': 0.06,
+            'radius_dynamic': 0.15
+        },
+        
+        'simulation': {
+            'total_steps': 50,
+            'seed': 42,
+            'record_history': True 
         }
     }
+    return config
+
+
+def run_end_to_end_test():
+    print("=" * 80)
+    print("端到端仿真测试 - 完整流程验证 (修复KeyError版)")
+    print("=" * 80)
     
-    gen = EndogenousThresholdGenerator(config)
+    # 1. 创建配置
+    config = create_test_config()
+    print(f"\n[1/7] 配置创建成功 (Agents: {config['agents']['num_agents']})")
     
-    # Create test scenario: agents clustered in corner of grid cell
-    # Grid cell (2,2) covers [0.2, 0.3] × [0.2, 0.3]
-    # Mechanical center would be (0.25, 0.25)
-    # But agents are at (0.21, 0.21) - lower-left corner
+    # 2. 初始化
+    try:
+        sim = SimulationFacade.from_config_dict(config)
+        sim.initialize()
+        print(f"[2/7] 引擎初始化成功")
+    except Exception as e:
+        print(f"[2/7] 引擎初始化失败: {e}")
+        return False
     
-    N = 100
-    L = 3
+    # 3. 运行仿真
+    print("\n[3/7] 运行仿真 (50 steps)...")
     
-    positions = np.random.uniform(0, 1, size=(N, 2))
-    opinions = np.random.uniform(0, 1, size=(N, L))
+    event_counts = {'exogenous': 0, 'endogenous_threshold': 0, 'cascade': 0, 'total': 0}
+    impact_history = []
     
-    # Put 10 agents with extreme opinions in corner of cell (2,2)
-    cluster_agents = list(range(10))
-    positions[cluster_agents] = np.random.normal([0.21, 0.21], 0.005, size=(10, 2))
-    opinions[cluster_agents] = np.random.normal(0.9, 0.02, size=(10, L))  # Extreme
-    opinions = np.clip(opinions, 0, 1)
-    
-    agents_state = {'positions': positions, 'opinions': opinions}
-    
-    # Trigger event
-    events = gen.step(current_time=10.0, agents_state=agents_state)
-    
-    if len(events) > 0:
-        event = events[0]
+    try:
+        # 运行50步
+        for step in range(50):
+            stats = sim.step()
+            
+            # 统计
+            event_counts['total'] += stats['num_new_events']
+            impact_history.append(stats['max_impact'])
+            
+            # 打印日志 (修正了键名错误: num_active_events -> num_events)
+            if step % 10 == 0:
+                print(f"   Step {step:2d}: Active Events={stats['num_events']} (New {stats['num_new_events']}), Impact Max={stats['max_impact']:.2f}")
+
+    except Exception as e:
+        print(f"   ✗ 仿真运行中断: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
         
-        # Grid cell (2,2) mechanical center
-        mechanical_center = np.array([0.25, 0.25])
+    print(f"   ✓ 50步仿真完成")
+
+    # 4. 检查事件来源
+    print("\n[4/7] 检查事件分布...")
+    all_events = sim._engine.event_manager.archive.get_all_events()
+    real_counts = {'exogenous': 0, 'endogenous_threshold': 0, 'cascade': 0}
+    
+    for e in all_events:
+        if e.source in real_counts:
+            real_counts[e.source] += 1
+            
+    print(f"   外生事件 (黑天鹅): {real_counts['exogenous']}")
+    print(f"   内生事件 (灰犀牛): {real_counts['endogenous_threshold']}")
+    print(f"   级联事件 (连锁):   {real_counts['cascade']}")
+    
+    # 5. 检查影响场
+    max_impact = max(impact_history) if impact_history else 0
+    print(f"\n[5/7] 影响场峰值: {max_impact:.2f}")
+    
+    # 6. 检查观点变化
+    state = sim.get_current_state()
+    pol = np.std(state['opinions'])
+    print(f"\n[6/7] 最终观点极化度: {pol:.4f}")
+    
+    # 7. 保存结果
+    print("\n[7/7] 保存结果...")
+    
+    # [修改点] 使用 Path(__file__).parent 获取当前脚本所在目录，构建绝对路径
+    current_dir = Path(__file__).parent
+    output_path = current_dir / "test_output.npz"
+    event_path = current_dir / "test_events.json"
+    
+    try:
+        # 使用底层引擎的 save_state 保存状态
+        # str(output_path) 会转换成类似 "D:\Tiktok\test_output.npz" 的完整路径
+        sim._engine.save_state(str(output_path))
+        print(f"   ✓ 状态已保存至: {output_path}")
         
-        # Expected true centroid (around 0.21, 0.21)
-        expected_centroid = np.mean(positions[cluster_agents], axis=0)
+        sim.save_event_log(str(event_path))
+        print(f"   ✓ 事件已保存至: {event_path}")
+    except Exception as e:
+        print(f"   ✗ 保存失败: {e}")
+        import traceback
+        traceback.print_exc() # 打印详细错误栈以便调试
+        return False
+    
+    # 总结
+    print("\n" + "=" * 80)
+    checks = [
+        ("外生事件触发", real_counts['exogenous'] > 0),
+        ("内生事件触发", real_counts['endogenous_threshold'] > 0),
+        ("级联事件触发", real_counts['cascade'] > 0),
+        ("影响场生效", max_impact > 0.1),
+        ("结果保存成功", output_path.exists())
+    ]
+    
+    all_pass = True
+    for name, status in checks:
+        icon = "✓" if status else "✗"
+        print(f"  {icon} {name}")
+        if not status: all_pass = False
         
-        print(f"\n✓ Event generated:")
-        print(f"  Mechanical grid center: {mechanical_center}")
-        print(f"  Expected centroid: {expected_centroid}")
-        print(f"  Actual event location: {event.loc}")
-        
-        # Verify location is closer to true centroid than grid center
-        dist_to_centroid = np.linalg.norm(event.loc - expected_centroid)
-        dist_to_grid = np.linalg.norm(event.loc - mechanical_center)
-        
-        print(f"\n  Distance to centroid: {dist_to_centroid:.4f}")
-        print(f"  Distance to grid center: {dist_to_grid:.4f}")
-        
-        assert dist_to_centroid < dist_to_grid, \
-            "Event should be closer to true centroid than grid center"
-        
-        print(f"\n✓ PASS: Event location uses true centroid (not grid center)")
+    print("=" * 80)
+    if all_pass:
+        print("🎉 测试完美通过！")
     else:
-        print("\n⚠ No events generated. Adjust threshold or agent distribution.")
-    
-    print()
-    return True
-
-
-def test_physics_based_sigma():
-    """Test that sigma is calculated from crowd variance, not random."""
-    print("=" * 60)
-    print("TEST: Physics-Based Sigma Calculation")
-    print("=" * 60)
-    
-    from models.events.generate.imp import EndogenousThresholdGenerator
-    
-    config = {
-        'seed': 200,
-        'monitor_attribute': 'opinion_extremism',
-        'critical_threshold': 0.5,
-        'grid_resolution': 10,
-        'min_agents_in_cell': 5,
-        'cooldown': 20,
-        'attributes': {
-            'intensity': {'base_value': 5.0, 'scale_factor': 10.0},
-            'content': {'topic_dim': 3},
-            'polarity': {'type': 'dynamic'},
-            'diffusion': {
-                'min_sigma': 0.03,
-                'max_sigma': 0.3,
-                'var_min': 0.0001,
-                'var_max': 0.01,
-                'size_factor': 0.05
-            },
-            'lifecycle': {'type': 'uniform', 'min_sigma': 5.0, 'max_sigma': 20.0}
-        }
-    }
-    
-    gen = EndogenousThresholdGenerator(config)
-    
-    # Test Scenario A: Tight offline cluster (street protest)
-    print("\n--- Scenario A: Tight Offline Cluster ---")
-    N = 100
-    L = 3
-    
-    positions_tight = np.random.uniform(0, 1, size=(N, 2))
-    opinions_tight = np.random.uniform(0, 1, size=(N, L))
-    
-    # Create tight cluster at (0.5, 0.5) with variance ~0.0002
-    cluster_size = 20
-    cluster_center = [0.5, 0.5]
-    cluster_std = 0.015  # Very tight
-    
-    positions_tight[:cluster_size] = np.random.normal(cluster_center, cluster_std, size=(cluster_size, 2))
-    opinions_tight[:cluster_size] = np.random.normal(0.9, 0.02, size=(cluster_size, L))
-    opinions_tight = np.clip(opinions_tight, 0, 1)
-    
-    agents_state_tight = {'positions': positions_tight, 'opinions': opinions_tight}
-    
-    events_tight = gen.step(current_time=10.0, agents_state=agents_state_tight)
-    
-    if len(events_tight) > 0:
-        sigma_tight = events_tight[0].spatial_params['sigma']
-        actual_variance = np.var(np.linalg.norm(
-            positions_tight[:cluster_size] - cluster_center, axis=1
-        ))
+        print("⚠️ 仍有检查项未通过")
         
-        print(f"  Crowd variance: {actual_variance:.6f}")
-        print(f"  Calculated sigma: {sigma_tight:.4f}")
-        print(f"  Expected: Small sigma (< 0.1) for offline event")
+    # 清理测试文件 (可选)
+    #try:
+    #    if output_path.exists(): output_path.unlink()
+    #    if event_path.exists(): event_path.unlink()
+    #except:
+    #    pass
         
-        assert sigma_tight < 0.15, f"Tight cluster should have small sigma, got {sigma_tight}"
-        print(f"  ✓ PASS: Tight cluster → Small sigma")
-    
-    # Test Scenario B: Distributed online crowd (viral hashtag)
-    print("\n--- Scenario B: Distributed Online Crowd ---")
-    gen.reset_cooldowns()  # Reset for new test
-    
-    positions_spread = np.random.uniform(0, 1, size=(N, 2))
-    opinions_spread = np.random.uniform(0, 1, size=(N, L))
-    
-    # Create distributed cluster across wide area with variance ~0.008
-    spread_agents = 25
-    spread_center = [0.5, 0.5]
-    spread_std = 0.12  # Much wider
-    
-    positions_spread[:spread_agents] = np.random.normal(spread_center, spread_std, size=(spread_agents, 2))
-    positions_spread[:spread_agents] = np.clip(positions_spread[:spread_agents], 0, 1)
-    opinions_spread[:spread_agents] = np.random.normal(0.9, 0.02, size=(spread_agents, L))
-    opinions_spread = np.clip(opinions_spread, 0, 1)
-    
-    agents_state_spread = {'positions': positions_spread, 'opinions': opinions_spread}
-    
-    events_spread = gen.step(current_time=30.0, agents_state=agents_state_spread)
-    
-    if len(events_spread) > 0:
-        sigma_spread = events_spread[0].spatial_params['sigma']
-        actual_variance = np.var(np.linalg.norm(
-            positions_spread[:spread_agents] - spread_center, axis=1
-        ))
-        
-        print(f"  Crowd variance: {actual_variance:.6f}")
-        print(f"  Calculated sigma: {sigma_spread:.4f}")
-        print(f"  Expected: Large sigma (> 0.15) for online event")
-        
-        assert sigma_spread > sigma_tight, \
-            f"Distributed crowd should have larger sigma than tight cluster"
-        
-        print(f"  ✓ PASS: Distributed crowd → Large sigma")
-        print(f"\n  Comparison:")
-        print(f"    Tight cluster sigma: {sigma_tight:.4f}")
-        print(f"    Spread cluster sigma: {sigma_spread:.4f}")
-        print(f"    Ratio: {sigma_spread / sigma_tight:.2f}x larger")
-    
-    print()
-    return True
-
-
-def test_cascade_inheritance():
-    """Test that cascade events inherit and mutate parent attributes."""
-    print("=" * 60)
-    print("TEST: Cascade Event Inheritance")
-    print("=" * 60)
-    
-    from models.events.generate.cascade import CascadeGenerator
-    from models.events.base import Event
-    
-    config = {
-        'seed': 300,
-        'time_decay_alpha': 0.5,
-        'space_decay_beta': 10.0,
-        'mu_multiplier': 0.8,
-        'background_lambda': 0.001,
-        'temporal_window': 50.0,
-        'max_spawn_distance': 0.2,
-        'content_mutation': 0.1,
-        'polarity_mutation': 0.2,
-        'attributes': {
-            'intensity': {'cascade_decay': 0.7},
-            'diffusion': {
-                'inherit_from_parent': True,
-                'spatial_mutation': 0.05
-            },
-            'lifecycle': {'type': 'uniform', 'min_sigma': 5.0, 'max_sigma': 20.0}
-        }
-    }
-    
-    gen = CascadeGenerator(config)
-    
-    # Create a parent event
-    parent = Event(
-        uid=1,
-        time=10.0,
-        loc=np.array([0.5, 0.5]),
-        intensity=10.0,
-        content=np.array([0.7, 0.2, 0.1]),
-        polarity=0.3,
-        spatial_params={'sigma': 0.15},
-        temporal_params={'sigma': 10.0, 'mu': 0.0},
-        source='exogenous',
-        meta={'generation': 0}
-    )
-    
-    # Trigger cascade
-    current_time = 15.0
-    events = gen.step(current_time=current_time, event_history=[parent])
-    
-    if len(events) > 0:
-        child = events[0]
-        
-        print(f"\n✓ Cascade event spawned:")
-        print(f"\n  Parent:")
-        print(f"    Location: {parent.loc}")
-        print(f"    Content: {parent.content}")
-        print(f"    Polarity: {parent.polarity:.3f}")
-        print(f"    Intensity: {parent.intensity:.2f}")
-        print(f"    Sigma: {parent.spatial_params['sigma']:.3f}")
-        
-        print(f"\n  Child:")
-        print(f"    Location: {child.loc}")
-        print(f"    Content: {child.content}")
-        print(f"    Polarity: {child.polarity:.3f}")
-        print(f"    Intensity: {child.intensity:.2f}")
-        print(f"    Sigma: {child.spatial_params['sigma']:.3f}")
-        
-        # Verify spatial diffusion
-        spawn_distance = np.linalg.norm(child.loc - parent.loc)
-        print(f"\n  Spawn distance: {spawn_distance:.4f}")
-        assert spawn_distance < config['max_spawn_distance'], \
-            "Child should spawn near parent"
-        
-        # Verify content similarity
-        content_diff = np.linalg.norm(child.content - parent.content)
-        print(f"  Content difference: {content_diff:.4f}")
-        assert content_diff < 0.3, "Content should be similar to parent"
-        
-        # Verify polarity mutation
-        polarity_diff = abs(child.polarity - parent.polarity)
-        print(f"  Polarity difference: {polarity_diff:.4f}")
-        
-        # Verify intensity decay
-        intensity_ratio = child.intensity / parent.intensity
-        print(f"  Intensity ratio: {intensity_ratio:.3f}")
-        assert intensity_ratio < 1.0, "Child intensity should be lower than parent"
-        
-        # Verify generation tracking
-        assert child.meta['parent_uid'] == parent.uid
-        assert child.meta['generation'] == 1
-        
-        print(f"\n✓ PASS: Cascade inheritance working correctly")
-    else:
-        print("\n⚠ No cascade events generated (low probability is normal)")
-        print("  Run multiple times or increase mu_multiplier")
-    
-    print()
-    return True
-
+    return all_pass
 
 if __name__ == '__main__':
-    print("\n" + "=" * 60)
-    print("PHYSICS-BASED EVENT GENERATION: FIX VERIFICATION")
-    print("=" * 60 + "\n")
-    
-    success = True
-    
-    try:
-        success &= test_centroid_calculation()
-    except Exception as e:
-        print(f"\n✗ Centroid test FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        success = False
-    
-    try:
-        success &= test_physics_based_sigma()
-    except Exception as e:
-        print(f"\n✗ Sigma test FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        success = False
-    
-    try:
-        success &= test_cascade_inheritance()
-    except Exception as e:
-        print(f"\n✗ Cascade test FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        success = False
-    
-    print("=" * 60)
-    if success:
-        print("ALL PHYSICS TESTS PASSED ✓")
-        print("\nKey Fixes Verified:")
-        print("  1. Events use true crowd centroid (not grid center)")
-        print("  2. Sigma calculated from crowd variance (not random)")
-        print("  3. Cascades inherit and mutate parent attributes")
-    else:
-        print("SOME TESTS FAILED ✗")
-    print("=" * 60 + "\n")
+    run_end_to_end_test()

@@ -192,8 +192,10 @@ class StepExecutor(SimulationEngine):
         event_locs, event_times, event_intensities, event_contents, event_polarities = \
             self.interface.get_event_state_vectors()
         
-        # Filter to active events (within temporal window)
-        if len(event_times) > 0:
+        # EventManager might return None if no events exist yet
+        has_events = (event_times is not None) and (len(event_times) > 0)
+
+        if has_events:
             # Build list of active events for the field calculator
             active_events = self._build_active_events_list(
                 event_locs, event_times, event_intensities,

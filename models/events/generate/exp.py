@@ -1,5 +1,5 @@
 """
-D:\Tiktok\models\events\generate\exp.py
+models\\events\\generate\\exp.py
 
 Exogenous Shock Generator (The "Black Swans")
 -------------------------------------------------
@@ -130,16 +130,20 @@ class ExogenousShockGenerator(EventGenerator):
         """
         attr_conf = self.attributes_config
 
-        # --- Sample L (Location) and Spatial Dynamics ---
+        # --- Sample L (Location) ---
         loc_conf = attr_conf.get('location', {})
-        loc = spatial_dist.sample_location(self.rng, loc_conf)
+        loc_type = loc_conf.get('type', 'uniform')  # [FIX] Extract type
+        loc = spatial_dist.sample_location(self.rng, loc_type, loc_conf)
 
+        # --- Sample Spatial Dynamics (Diffusion) ---
         diff_conf = attr_conf.get('diffusion', {})
-        s_params = spatial_dist.sample_diffusion_params(self.rng, diff_conf)
+        diff_type = diff_conf.get('type', 'constant') # [FIX] Extract type
+        s_params = spatial_dist.sample_diffusion_params(self.rng, diff_type, diff_conf)
 
-        # --- Sample Temporal Dynamics ---
+        # --- Sample Temporal Dynamics (Lifecycle) ---
         life_conf = attr_conf.get('lifecycle', {})
-        t_params = time_dist.sample_lifecycle_params(self.rng, life_conf)
+        life_type = life_conf.get('type', 'constant') # [FIX] Extract type
+        t_params = time_dist.sample_lifecycle_params(self.rng, life_type, life_conf)
 
         # --- Sample I (Intensity) ---
         int_conf = attr_conf.get('intensity', {})

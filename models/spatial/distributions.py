@@ -111,7 +111,7 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         
         locations = np.vstack(all_locations)
         np.random.shuffle(locations) # Shuffle to mix nodes from different cities
-        locations = np.clip(locations, 0.0, 1.0)```
+        locations = np.clip(locations, 0.0, 1.0)
 
     elif dist_type == 'clustered':
         # --- Clustered Distribution ---
@@ -351,9 +351,6 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         locations = np.vstack([x, y]).T
         locations = np.clip(locations, 0.0, 1.0)
 
-    else:
-        raise ValueError(f"Unknown spatial distribution type: '{dist_type}'")
-
     elif dist_type == 'hex_lattice':
         # --- Hexagonal Lattice Distribution (Central Place Theory) ---
         # Places nodes on a hexagonal grid, which is the most efficient way to tile a plane.
@@ -489,4 +486,8 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         locations = np.vstack([x, y]).T
         locations = np.clip(locations, 0.0, 1.0)
 
+    else:
+        raise ValueError(f"Unknown spatial distribution type: '{dist_type}'")
+
     return locations
+

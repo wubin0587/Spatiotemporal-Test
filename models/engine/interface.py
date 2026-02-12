@@ -201,20 +201,6 @@ class EngineInterface:
         
         # Use the multilayer builder from networks module
         self.network_graph = build_multilayer_network(network_config)
-
-        # The execution engine assumes integer node ids [0, N).
-        # Multilayer builders may return tuple labels (e.g. (layer, node_id)),
-        # so normalize labels here to keep the engine/network contract consistent.
-        if self.network_graph.number_of_nodes() > 0:
-            sample_node = next(iter(self.network_graph.nodes()))
-            if not isinstance(sample_node, int):
-                self.logger.info(
-                    "Normalizing non-integer network node labels to integer indices."
-                )
-                self.network_graph = nx.convert_node_labels_to_integers(
-                    self.network_graph,
-                    label_attribute='supra_id'
-                )
         
         # Validate the result
         if self.network_graph.number_of_nodes() == 0:

@@ -11,34 +11,24 @@ chain reactions.
 This generator is history-dependent and requires access to the list of all
 previously occurred events.
 
-TODO: Implement the logic for this generator.
-
-Configuration Guide (config.yaml):
--------------------------------------------------------------------------
-events:
-  generation:
-    endogenous_cascade:
-      enabled: True
-      seed: 2026
-      
-      # Parameters for the Hawkes Process Trigger Kernel g(t, d)
-      # Typically g = intensity * alpha * exp(-alpha * t) * beta * exp(-beta * d)
-      
-      # Temporal decay rate
-      time_decay_alpha: 0.5
-      
-      # Spatial decay rate
-      space_decay_beta: 10.0 # High value for strong localization
-      
-      # Influence multiplier (how much one event triggers others)
-      mu_multiplier: 0.8
-      
-      # Base rate of triggering (can be set to a very low value)
-      background_lambda: 0.001
-      
-      # Grid resolution for calculating the intensity map
-      grid_resolution: 20
--------------------------------------------------------------------------
+# TODO: Implement Hawkes Process Cascade Logic (Particle-Based Approach)
+        # 1. Temporal Filtering: 
+        #    Identify 'active' parent events from `event_history` within a 
+        #    time-decay window (t - t_i < window) to avoid O(N^2) complexity.
+        # 2. Stochastic Triggering:
+        #    For each active event, calculate current intensity lambda(t) = mu * exp(-alpha * dt).
+        #    Perform a Bernoulli trial (or Poisson sampling) based on lambda to determine 
+        #    if a new cascade event is triggered this step.
+        # 3. Spatial Diffusion & Spawning:
+        #    If triggered, spawn a child event near the parent's location (L) using 
+        #    an exponential or Gaussian spatial kernel (beta) to simulate 
+        #    localized viral spread.
+        # 4. Attribute Inheritance (C, P, I):
+        #    The new event should inherit content (C) and polarity (P) from its 
+        #    parent with a small mutation factor (noise) to simulate semantic 
+        #    drift/polarization in the cascade.
+        # 5. Return List of New Events:
+        #    Aggregate and return the newly generated child events.
 """
 
 from typing import List, Dict, Any

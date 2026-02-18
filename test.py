@@ -15,26 +15,56 @@ from models.engine.facade import SimulationFacade
 def create_test_config():
     """创建测试配置 - 参数已优化以确保触发各类事件"""
     config = {
-        'agents': {
-            'num_agents': 200,
-            'opinion_layers': 3,
-            'initial_opinions': {
-                # 增加初始极化，更容易触发内生事件
-                'type': 'polarized',
-                'params': {
-                    'split': 0.5
+        'engine': {
+            'interface': {
+                'agents': {
+                    'num_agents': 200,
+                    'opinion_layers': 3,
+                    'initial_opinions': {
+                        # 增加初始极化，更容易触发内生事件
+                        'type': 'polarized',
+                        'params': {
+                            'split': 0.5
+                        }
+                    }
+                },
+                'simulation': {
+                    'total_steps': 50,
+                    'seed': 42,
+                    'record_history': True
+                }
+            },
+            'maths': {
+                'dynamics': {
+                    'epsilon_base': 0.25,
+                    'mu_base': 0.35,
+                    'alpha_mod': 0.25,
+                    'beta_mod': 0.15,
+                    'backfire': False
+                },
+                'field': {
+                    'alpha': 6.0,
+                    'beta': 0.08,
+                    'temporal_window': 100.0
+                },
+                'topo': {
+                    'threshold': 0.3,
+                    'radius_base': 0.06,
+                    'radius_dynamic': 0.15
                 }
             }
         },
-        
-        'network': {
-            'layers': [
-                {
-                    'name': 'social',
-                    'type': 'small_world',
-                    'params': {'n': 200, 'k': 8, 'p': 0.1}
-                }
-            ]
+
+        'networks': {
+            'builder': {
+                'layers': [
+                    {
+                        'name': 'social',
+                        'type': 'small_world',
+                        'params': {'n': 200, 'k': 8, 'p': 0.1}
+                    }
+                ]
+            }
         },
         
         'spatial': {
@@ -96,32 +126,6 @@ def create_test_config():
                     }
                 }
             }
-        },
-        
-        'dynamics': {
-            'epsilon_base': 0.25,
-            'mu_base': 0.35,
-            'alpha_mod': 0.25,
-            'beta_mod': 0.15,
-            'backfire': False
-        },
-        
-        'field': {
-            'alpha': 6.0,
-            'beta': 0.08,
-            'temporal_window': 100.0
-        },
-        
-        'topology': {
-            'threshold': 0.3,
-            'radius_base': 0.06,
-            'radius_dynamic': 0.15
-        },
-        
-        'simulation': {
-            'total_steps': 50,
-            'seed': 42,
-            'record_history': True 
         }
     }
     return config
@@ -134,7 +138,7 @@ def run_end_to_end_test():
     
     # 1. 创建配置
     config = create_test_config()
-    print(f"\n[1/7] 配置创建成功 (Agents: {config['agents']['num_agents']})")
+    print(f"\n[1/7] 配置创建成功 (Agents: {config['engine']['interface']['agents']['num_agents']})")
     
     # 2. 初始化
     try:
@@ -204,7 +208,7 @@ def run_end_to_end_test():
     
     try:
         # 使用底层引擎的 save_state 保存状态
-        # str(output_path) 会转换成类似 "D:\Tiktok\test_output.npz" 的完整路径
+        # str(output_path) 会转换成类似 "<repo>/test_output.npz" 的完整路径
         sim._engine.save_state(str(output_path))
         print(f"   ✓ 状态已保存至: {output_path}")
         

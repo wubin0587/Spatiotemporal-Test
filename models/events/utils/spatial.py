@@ -1,5 +1,5 @@
 """
-D:\Tiktok\models\events\utils\spatial.py
+models/events/utils/spatial.py
 
 Spatial Dynamics Utilities
 --------------------------

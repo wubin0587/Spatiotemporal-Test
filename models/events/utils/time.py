@@ -1,5 +1,5 @@
 """
-D:\Tiktok\models\events\utils\time.py
+models/events/utils/time.py
 
 Temporal Dynamics Utilities
 ---------------------------

@@ -1,7 +1,12 @@
-agents:
-network:
+engine:
+  interface:
+    agents:
+    simulation:
+  maths:
+    dynamics:
+    field:
+    topo:
 events:
-dynamics:
-simulation:
-field:
-topology:
+networks:
+  builder:
+spatial:

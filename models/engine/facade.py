@@ -63,12 +63,63 @@ class SimulationFacade:
             from_config_dict) rather than calling this constructor directly.
         """
         self.config = config
+        self._validate_config_schema()
         self._engine: Optional[StepExecutor] = None
         self._initialized: bool = False
         self._results: Optional[Dict[str, Any]] = None
         
         logger.info("SimulationFacade created")
-    
+
+    def _validate_config_schema(self):
+        """
+        Validate strict file-aligned config naming.
+
+        Required top-level keys:
+            - engine
+            - events
+            - networks
+            - spatial
+
+        Required engine sub-keys:
+            - engine.interface.agents
+            - engine.interface.simulation
+            - engine.maths.dynamics
+            - engine.maths.field
+            - engine.maths.topo
+        """
+        required_top_level = ['engine', 'events', 'networks', 'spatial']
+        missing = [k for k in required_top_level if k not in self.config]
+        if missing:
+            raise ValueError(
+                "Configuration missing top-level sections: " + ', '.join(missing)
+            )
+
+        engine_cfg = self.config.get('engine')
+        if not isinstance(engine_cfg, dict):
+            raise ValueError("Configuration section 'engine' must be a dictionary.")
+
+        interface_cfg = engine_cfg.get('interface')
+        if not isinstance(interface_cfg, dict):
+            raise ValueError("Configuration section 'engine.interface' must be a dictionary.")
+
+        maths_cfg = engine_cfg.get('maths')
+        if not isinstance(maths_cfg, dict):
+            raise ValueError("Configuration section 'engine.maths' must be a dictionary.")
+
+        for key in ['agents', 'simulation']:
+            if not isinstance(interface_cfg.get(key), dict):
+                raise ValueError(f"Configuration section 'engine.interface.{key}' must be a dictionary.")
+
+        for key in ['dynamics', 'field', 'topo']:
+            if not isinstance(maths_cfg.get(key), dict):
+                raise ValueError(f"Configuration section 'engine.maths.{key}' must be a dictionary.")
+
+        networks_cfg = self.config.get('networks')
+        if not isinstance(networks_cfg, dict) or not isinstance(networks_cfg.get('builder'), dict):
+            raise ValueError(
+                "Configuration section 'networks.builder' must be provided and be a dictionary."
+            )
+
     # =========================================================================
     # Factory Methods (Recommended Entry Points)
     # =========================================================================
@@ -100,7 +151,10 @@ class SimulationFacade:
         
         with open(filepath, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
-        
+
+        if config is None:
+            raise ValueError(f"Configuration file is empty: {filepath}")
+
         return cls(config)
     
     @classmethod
@@ -364,7 +418,6 @@ class SimulationFacade:
         Returns:
             Dict[str, Any]: Configuration dictionary (read-only copy).
         """
-        import copy
         return copy.deepcopy(self.config)
     
     def get_num_agents(self) -> int:

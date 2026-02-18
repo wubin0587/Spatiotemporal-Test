@@ -53,11 +53,13 @@ class StepExecutor(SimulationEngine):
         self.interface = EngineInterface(config)
         
         # Extract configuration sections for easy access
-        self.agent_config = config.get('agents', {})
-        self.sim_config = config.get('simulation', {})
-        self.dynamics_config = config.get('dynamics', {})
-        self.field_config = config.get('field', {})
-        self.topology_config = config.get('topology', {})
+        interface_cfg = config.get('engine', {}).get('interface', {})
+        maths_cfg = config.get('engine', {}).get('maths', {})
+        self.agent_config = interface_cfg.get('agents', {})
+        self.sim_config = interface_cfg.get('simulation', {})
+        self.dynamics_config = maths_cfg.get('dynamics', {})
+        self.field_config = maths_cfg.get('field', {})
+        self.topology_config = maths_cfg.get('topo', {})
         
         # History tracking (optional, for analysis)
         self.history = {

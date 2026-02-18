@@ -1,0 +1,3 @@
+type: clustered
+n_clusters: 6
+cluster_std: 0.08

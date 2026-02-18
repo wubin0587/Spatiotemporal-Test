@@ -1,0 +1,4 @@
+type: rgg
+params:
+  n: 1000
+  radius: 0.07

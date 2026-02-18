@@ -1,0 +1,4 @@
+type: radial_decay
+center: [0.5, 0.5]
+max_radius: 0.5
+strength: 2.2

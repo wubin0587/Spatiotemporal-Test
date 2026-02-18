@@ -1,0 +1,4 @@
+type: erdos_renyi
+params:
+  n: 1000
+  p: 0.01

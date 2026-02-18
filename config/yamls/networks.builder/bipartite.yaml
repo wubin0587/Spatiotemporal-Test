@@ -1,0 +1,5 @@
+type: bipartite
+params:
+  n: 800
+  m: 200
+  p: 0.02

@@ -1,0 +1,4 @@
+type: scale_free
+params:
+  n: 1000
+  m: 4

@@ -1,0 +1,3 @@
+type: wedge
+radius_range: [0.05, 0.5]
+angle_range: [20, 140]

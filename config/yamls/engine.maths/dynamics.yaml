@@ -1,0 +1,5 @@
+epsilon_base: 0.20
+mu_base: 0.30
+alpha_mod: 0.25
+beta_mod: 0.15
+backfire: false

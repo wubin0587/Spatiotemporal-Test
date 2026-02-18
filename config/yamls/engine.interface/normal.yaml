@@ -1,0 +1,4 @@
+type: normal
+params:
+  mean: 0.5
+  std: 0.18

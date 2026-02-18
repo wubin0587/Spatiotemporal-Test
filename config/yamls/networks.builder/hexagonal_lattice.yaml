@@ -1,0 +1,4 @@
+type: hexagonal_lattice
+params:
+  m: 24
+  n: 24

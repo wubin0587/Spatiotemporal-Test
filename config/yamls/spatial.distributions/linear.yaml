@@ -1,0 +1,4 @@
+type: linear
+start: [0.05, 0.15]
+end: [0.95, 0.85]
+noise: 0.02

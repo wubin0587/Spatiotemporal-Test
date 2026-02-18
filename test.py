@@ -208,7 +208,7 @@ def run_end_to_end_test():
     
     try:
         # 使用底层引擎的 save_state 保存状态
-        # str(output_path) 会转换成类似 "D:\Tiktok\test_output.npz" 的完整路径
+        # str(output_path) 会转换成类似 "<repo>/test_output.npz" 的完整路径
         sim._engine.save_state(str(output_path))
         print(f"   ✓ 状态已保存至: {output_path}")
         

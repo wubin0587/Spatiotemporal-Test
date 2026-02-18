@@ -1,5 +1,5 @@
 """
-D:\Tiktok\models\events\archive\query.py
+models/events/archive/query.py
 
 Vectorized Query Logic for Event Archive
 ----------------------------------------

@@ -1,4 +1,4 @@
-# D:\Tiktok\models\spatial\distribution.py
+# models/spatial/distributions.py
 
 import numpy as np
 from sklearn.datasets import make_blobs, make_circles

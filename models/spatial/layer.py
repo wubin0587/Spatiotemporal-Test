@@ -1,4 +1,4 @@
-# D:\Tiktok\models\spatial\layer.py
+# models/spatial/layer.py
 
 import logging
 import networkx as nx

@@ -1,5 +1,4 @@
 """
-D:\Tiktok\models\events\base.py
 
 Core Definitions for the Event-Driven Social Analysis Framework.
 This module defines the fundamental data structures and interfaces for the simulation.

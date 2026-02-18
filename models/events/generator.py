@@ -1,5 +1,4 @@
 """
-D:\Tiktok\models\events\generator.py
 
 Abstract Base Class for Event Generators.
 -----------------------------------------

@@ -1,5 +1,4 @@
 """
-D:\Tiktok\models\events\manager.py
 
 Event Subsystem Manager (The Facade)
 ------------------------------------

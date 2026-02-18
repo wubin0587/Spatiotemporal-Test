@@ -1,0 +1,10 @@
+enabled:
+seed:
+time_trigger:
+attributes:
+  location:
+  intensity:
+  content:
+  polarity:
+  diffusion:
+  lifecycle:

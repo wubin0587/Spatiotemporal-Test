@@ -1,0 +1,3 @@
+threshold: 0.25
+radius_base: 0.05
+radius_dynamic: 0.12

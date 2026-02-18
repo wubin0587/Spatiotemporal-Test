@@ -1,0 +1,4 @@
+type: clustered
+params:
+  num_clusters: 4
+  cluster_std: 0.12

@@ -1,0 +1,9 @@
+type: concentric_rings
+center: [0.5, 0.5]
+rings:
+  - proportion: 0.15
+    radius_range: [0.0, 0.08]
+  - proportion: 0.35
+    radius_range: [0.08, 0.22]
+  - proportion: 0.50
+    radius_range: [0.22, 0.5]

@@ -1,0 +1,5 @@
+type: watts_strogatz
+params:
+  n: 1000
+  k: 12
+  p: 0.08

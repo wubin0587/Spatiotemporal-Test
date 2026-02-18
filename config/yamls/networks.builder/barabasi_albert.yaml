@@ -1,0 +1,4 @@
+type: barabasi_albert
+params:
+  n: 1000
+  m: 4

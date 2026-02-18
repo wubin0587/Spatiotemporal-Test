@@ -1,0 +1,5 @@
+type: small_world
+params:
+  n: 1000
+  k: 12
+  p: 0.08

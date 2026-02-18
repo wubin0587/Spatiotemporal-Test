@@ -39,18 +39,16 @@ class SimulationEngine(ABC):
         Args:
             config (Dict[str, Any]): The complete configuration dictionary loaded
                                      from YAML. Must contain sections for:
-                                     - 'agents': Number of agents, initial conditions
-                                     - 'network': Network topology configuration
-                                     - 'events': Event generation configuration
-                                     - 'dynamics': Opinion update parameters
-                                     - 'simulation': Time steps, seed, etc.
+                                     - File-aligned schema:
+                                       'engine', 'events', 'networks', 'spatial'
         """
         self.config = config
         
         # Simulation Control
         self.current_time: float = 0.0
         self.time_step: int = 0
-        self.total_steps: int = config.get('simulation', {}).get('total_steps', 1000)
+        simulation_cfg = self.config.get('engine', {}).get('interface', {}).get('simulation', {})
+        self.total_steps: int = simulation_cfg.get('total_steps', 1000)
         
         # State Containers (to be initialized by concrete implementations)
         self.num_agents: int = 0
@@ -184,19 +182,19 @@ class SimulationEngine(ABC):
     # =========================================================================
     # Configuration Access (Helper methods)
     # =========================================================================
-    
+
     def get_dynamics_params(self) -> Dict[str, Any]:
-        """Returns the dynamics configuration section."""
-        return self.config.get('dynamics', {})
-    
+        """Returns the engine.maths.dynamics configuration section."""
+        return self.config.get('engine', {}).get('maths', {}).get('dynamics', {})
+
     def get_field_params(self) -> Dict[str, Any]:
-        """Returns the field (impact calculation) configuration section."""
-        return self.config.get('field', {})
-    
+        """Returns the engine.maths.field configuration section."""
+        return self.config.get('engine', {}).get('maths', {}).get('field', {})
+
     def get_topology_params(self) -> Dict[str, Any]:
-        """Returns the topology (neighbor selection) configuration section."""
-        return self.config.get('topology', {})
-    
+        """Returns the engine.maths.topo configuration section."""
+        return self.config.get('engine', {}).get('maths', {}).get('topo', {})
+
     # =========================================================================
     # Validation Methods
     # =========================================================================
@@ -219,14 +217,47 @@ class SimulationEngine(ABC):
     
     def _validate_config(self):
         """
-        Validates that the configuration contains all required sections.
+        Validates strict file-aligned configuration naming.
         Should be called in initialize().
         """
-        required_sections = ['agents', 'network', 'events', 'dynamics', 'simulation']
-        for section in required_sections:
-            if section not in self.config:
-                raise ValueError(f"Configuration missing required section: '{section}'")
-    
+        required_top_level = ['engine', 'events', 'networks', 'spatial']
+        missing_top_level = [key for key in required_top_level if key not in self.config]
+        if missing_top_level:
+            raise ValueError(
+                "Configuration missing required top-level sections: "
+                f"{missing_top_level}"
+            )
+
+        engine_cfg = self.config.get('engine')
+        if not isinstance(engine_cfg, dict):
+            raise ValueError("Configuration section 'engine' must be a dictionary.")
+
+        interface_cfg = engine_cfg.get('interface')
+        if not isinstance(interface_cfg, dict):
+            raise ValueError("Configuration section 'engine.interface' must be a dictionary.")
+
+        maths_cfg = engine_cfg.get('maths')
+        if not isinstance(maths_cfg, dict):
+            raise ValueError("Configuration section 'engine.maths' must be a dictionary.")
+
+        for key in ['agents', 'simulation']:
+            if not isinstance(interface_cfg.get(key), dict):
+                raise ValueError(f"Configuration section 'engine.interface.{key}' must be a dictionary.")
+
+        for key in ['dynamics', 'field', 'topo']:
+            if not isinstance(maths_cfg.get(key), dict):
+                raise ValueError(f"Configuration section 'engine.maths.{key}' must be a dictionary.")
+
+        networks_cfg = self.config.get('networks')
+        if not isinstance(networks_cfg, dict) or not isinstance(networks_cfg.get('builder'), dict):
+            raise ValueError("Configuration section 'networks.builder' must be a dictionary.")
+
+        if not isinstance(self.config.get('events'), dict):
+            raise ValueError("Configuration section 'events' must be a dictionary.")
+
+        if not isinstance(self.config.get('spatial'), dict):
+            raise ValueError("Configuration section 'spatial' must be a dictionary.")
+
     # =========================================================================
     # Utility Methods (Can be used by concrete implementations)
     # =========================================================================

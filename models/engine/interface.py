@@ -193,11 +193,12 @@ class EngineInterface:
         """
         self.logger.info("Building network topology...")
         
-        # Validate network section exists
-        if 'network' not in self.config:
-            raise ValueError("Configuration missing 'network' section.")
-        
-        network_config = self.config['network']
+        # Validate networks.builder section exists
+        networks_cfg = self.config.get('networks', {})
+        if 'builder' not in networks_cfg:
+            raise ValueError("Configuration missing 'networks.builder' section.")
+
+        network_config = networks_cfg['builder']
         
         # Use the multilayer builder from networks module
         self.network_graph = build_multilayer_network(network_config)
@@ -536,8 +537,10 @@ class EngineInterface:
     def log_configuration_summary(self):
         """Logs a summary of the configuration for debugging."""
         self.logger.info("=== Configuration Summary ===")
-        self.logger.info(f"Agents: {self.config.get('agents', {})}")
-        self.logger.info(f"Network: {self.config.get('network', {}).get('type', 'N/A')}")
+        interface_cfg = self.config.get('engine', {}).get('interface', {})
+        maths_cfg = self.config.get('engine', {}).get('maths', {})
+        self.logger.info(f"Agents: {interface_cfg.get('agents', {})}")
+        self.logger.info(f"Network: {self.config.get('networks', {}).get('builder', {}).get('type', 'N/A')}")
         self.logger.info(f"Events: {list(self.config.get('events', {}).get('generation', {}).keys())}")
-        self.logger.info(f"Dynamics: {self.config.get('dynamics', {})}")
+        self.logger.info(f"Dynamics: {maths_cfg.get('dynamics', {})}")
         self.logger.info("=============================")

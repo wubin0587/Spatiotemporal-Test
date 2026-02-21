@@ -113,7 +113,7 @@ def homophilous_bimodality_index(
     alpha: float = 0.5,
     opinion_range: tuple[float, float] = (-1.0, 1.0),
 ) -> float:
-    """同质双峰指数 (Homophilous Bimodality Index, HBI).
+    """Homophilous Bimodality Index, HBI.
 
     HBI = alpha * normalized_bimodality + (1 - alpha) * homophily
 

@@ -7,7 +7,7 @@ from scipy.spatial import Delaunay
 from typing import Dict, Any, Optional
 
 # Import internal modules
-from .distribution import create_spatial_distribution
+from .distributions import create_spatial_distribution
 from .ops import (
     build_spatial_index, 
     query_k_nearest_neighbors, 

@@ -81,7 +81,17 @@ def moran_i(
     values: Sequence[float] | np.ndarray,
     weights: Sequence[Sequence[float]] | np.ndarray,
 ) -> float:
-    """Global Moran's I for spatial autocorrelation."""
+    """Global Moran's I for spatial autocorrelation.
+
+    Args:
+        values: Sequence of length N.
+        weights: Spatial weight matrix of shape (N, N).
+
+    Notes:
+        ``weights`` must be a square matrix with the same length as ``values``.
+        Callers are responsible for constructing this matrix (for example, from
+        a graph adjacency/affinity representation).
+    """
     x = np.asarray(values, dtype=float).reshape(-1)
     w = np.asarray(weights, dtype=float)
     if w.ndim != 2 or w.shape[0] != w.shape[1] or w.shape[0] != x.size:

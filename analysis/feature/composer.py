@@ -6,18 +6,16 @@ Feature Composer Module
 Aggregates per-step feature dicts (produced by extractor.py) across time to
 generate longitudinal / time-series feature tables.
 
-Also handles multi-layer aggregation: runs extractor across all L opinion
-layers and combines results.
+Also handles multi-layer aggregation and computes trend-based metrics for AI analysis.
 
 Data contract
 -------------
 Input:
     step_features : List[Dict]   – one dict per time step from extract_all_features()
-    Each dict has keys: 'meta', 'opinion', 'spatial', 'topo', 'network_opinion', 'event'
 
 Output:
     composed : Dict[str, np.ndarray]  key → 1-D time-series array of length T
-    summary  : Dict[str, float]       aggregate statistics (mean / std / min / max)
+    summary  : Dict[str, float]       aggregate stats + trend metrics
 """
 
 from __future__ import annotations
@@ -34,14 +32,6 @@ import numpy as np
 def _flatten(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
     """
     Recursively flatten a nested dict to dot-notation keys.
-
-    Examples
-    --------
-    {'opinion': {'mean_opinion': 0.5}} → {'opinion.mean_opinion': 0.5}
-
-    DATA STRUCTURE VALIDITY:
-        Only scalar float / int values are kept.
-        Lists, arrays, dicts are recursed or skipped.
     """
     out: Dict[str, float] = {}
     for k, v in d.items():
@@ -50,8 +40,56 @@ def _flatten(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
             out.update(_flatten(v, full_key))
         elif isinstance(v, (int, float, np.floating, np.integer)):
             out[full_key] = float(v)
-        # lists / arrays / None are intentionally skipped
     return out
+
+
+def _calculate_trend_metrics(arr: np.ndarray, window_ratio: float = 0.1) -> Dict[str, float]:
+    """
+    Compute evolution metrics for a single time-series array.
+    Used to give AI context about 'how' the value changed, not just the mean.
+    
+    Metrics:
+    - trend_slope:      Slope of linear regression (direction of change).
+    - evolution_delta:  Mean(End) - Mean(Start).
+    - start_mean:       Average of first 10%.
+    - end_mean:         Average of last 10%.
+    - final_stability:  Std dev of last 10% (lower = converged).
+    - volatility:       Std dev of step-to-step changes (roughness).
+    """
+    # Filter NaNs for trend calculation
+    y = arr[~np.isnan(arr)]
+    n = len(y)
+    
+    if n < 2:
+        return {}
+
+    # 1. Linear Trend (Slope)
+    # We normalize X to [0, 1] so slope represents "total change if linear"
+    # This makes the slope independent of the number of steps (T).
+    x = np.linspace(0, 1, n)
+    slope, _ = np.polyfit(x, y, 1)
+
+    # 2. Early vs Late (Evolution)
+    w_size = max(1, int(n * window_ratio))
+    start_vals = y[:w_size]
+    end_vals = y[-w_size:]
+    
+    start_mean = np.mean(start_vals)
+    end_mean = np.mean(end_vals)
+    
+    # 3. Volatility (smoothness)
+    # Std dev of the first difference: how much does it jump per step?
+    diffs = np.diff(y)
+    volatility = np.std(diffs) if len(diffs) > 0 else 0.0
+
+    return {
+        "trend_slope":     float(slope),
+        "evolution_delta": float(end_mean - start_mean),
+        "start_mean":      float(start_mean),
+        "end_mean":        float(end_mean),
+        "final_stability": float(np.std(end_vals)), # Low value = Converged
+        "volatility":      float(volatility),
+    }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -59,23 +97,10 @@ def _flatten(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
 # ═════════════════════════════════════════════════════════════════════════════
 
 def flatten_step(step_feat: Dict[str, Any]) -> Dict[str, float]:
-    """
-    Flatten a single step's feature dict into a flat scalar dict.
-
-    DATA STRUCTURE REQUIREMENTS:
-        step_feat must be the output of extract_all_features():
-            keys: 'meta', 'opinion', 'spatial', 'topo', 'network_opinion', 'event'
-        Non-scalar values (lists, arrays) in 'meta' (e.g., 'data_issues') are skipped.
-
-    Returns
-    -------
-    dict[str, float]  –  dot-separated keys, all float values
-    """
-    # Exclude 'meta' keys that are not scalar
+    """Flatten a single step's feature dict into a flat scalar dict."""
     flat: Dict[str, float] = {}
     for section_key, section_val in step_feat.items():
         if section_key == "meta":
-            # Only include numeric meta fields
             for mk, mv in section_val.items():
                 if isinstance(mv, (int, float, np.floating, np.integer)) and mv is not None:
                     flat[f"meta.{mk}"] = float(mv)
@@ -91,30 +116,13 @@ def flatten_step(step_feat: Dict[str, Any]) -> Dict[str, float]:
 def compose_timeseries(
     step_features: List[Dict[str, Any]],
 ) -> Dict[str, np.ndarray]:
-    """
-    Stack per-step flat dicts into time-series arrays.
-
-    DATA STRUCTURE REQUIREMENTS:
-        step_features: non-empty list of dicts from extract_all_features()
-        All steps should share the same set of keys (missing keys filled with NaN).
-
-    Returns
-    -------
-    dict[str, np.ndarray]
-        Each key maps to a 1-D float64 array of length T (num steps).
-
-    DATA STRUCTURE VALIDITY:
-        - Empty list → returns {}
-        - Steps with missing keys get NaN for that step
-        - Keys present in some steps but not others are kept with NaN padding
-    """
+    """Stack per-step flat dicts into time-series arrays."""
     if not step_features:
         return {}
 
     T = len(step_features)
     flat_steps = [flatten_step(s) for s in step_features]
 
-    # Union of all keys
     all_keys = sorted({k for fs in flat_steps for k in fs})
 
     timeseries: Dict[str, np.ndarray] = {}
@@ -126,42 +134,62 @@ def compose_timeseries(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Summary statistics
+# Summary statistics (Extended)
 # ═════════════════════════════════════════════════════════════════════════════
 
 def summarize_timeseries(
     timeseries: Dict[str, np.ndarray],
     percentiles: Sequence[float] = (25.0, 50.0, 75.0),
+    include_trends: bool = True,
 ) -> Dict[str, Dict[str, float]]:
     """
-    Compute summary statistics over each time-series.
+    Compute summary statistics AND trend metrics over each time-series.
 
     Parameters
     ----------
     timeseries : output of compose_timeseries()
     percentiles : which percentiles to include
+    include_trends : if True, calculates slope, volatility, convergence stats
+                     (Recommended for AI analysis)
 
     Returns
     -------
-    dict[str, dict]  – per-key stats:  mean, std, min, max, p25, p50, p75, ...
-
-    DATA STRUCTURE VALIDITY:
-        NaN values are ignored via np.nanmean / np.nanstd etc.
-        All-NaN arrays produce NaN summary stats (not errors).
+    dict[str, dict]
+        Per-key stats. Example keys:
+        - 'mean', 'std', 'max'
+        - 'trend_slope' (if positive, metric is growing)
+        - 'final_stability' (if low, system converged)
     """
     summary: Dict[str, Dict[str, float]] = {}
+    
     for key, arr in timeseries.items():
+        # Remove NaNs for stat calculation
         valid = arr[~np.isnan(arr)]
+        n_valid = len(valid)
+        
+        # 1. Basic Stats
         stats: Dict[str, float] = {
-            "mean":  float(np.nanmean(arr)),
-            "std":   float(np.nanstd(arr)),
-            "min":   float(np.nanmin(arr)),
-            "max":   float(np.nanmax(arr)),
-            "n_valid": float(len(valid)),
+            "mean":    float(np.nanmean(arr)),
+            "std":     float(np.nanstd(arr)),
+            "min":     float(np.nanmin(arr)),
+            "max":     float(np.nanmax(arr)),
+            "n_valid": float(n_valid),
         }
-        for p in percentiles:
-            stats[f"p{int(p)}"] = float(np.nanpercentile(arr, p)) if len(valid) > 0 else float("nan")
+        
+        if n_valid > 0:
+            for p in percentiles:
+                stats[f"p{int(p)}"] = float(np.nanpercentile(valid, p))
+        else:
+            for p in percentiles:
+                stats[f"p{int(p)}"] = float("nan")
+
+        # 2. Trend Metrics (Feature Engineering for AI)
+        if include_trends and n_valid >= 5: # Need a few points for trend
+            trends = _calculate_trend_metrics(arr)
+            stats.update(trends)
+        
         summary[key] = stats
+
     return summary
 
 
@@ -171,27 +199,10 @@ def summarize_timeseries(
 
 def compose_multilayer(
     opinion_matrix: np.ndarray,
-    extract_fn,               # callable: (opinions, layer_idx) → Dict
+    extract_fn,
     agg: str = "mean",
 ) -> Dict[str, float]:
-    """
-    Run an opinion-feature extractor across all L layers and aggregate.
-
-    Parameters
-    ----------
-    opinion_matrix : (N, L) float array
-    extract_fn     : callable accepting (opinion_matrix, layer_idx=int)
-                     returning Dict[str, float]
-    agg            : 'mean' | 'max' | 'min' | 'std'
-
-    Returns
-    -------
-    dict[str, float]  – aggregated per-layer features
-
-    DATA STRUCTURE VALIDITY:
-        opinion_matrix must be 2-D with shape (N, L), L >= 1.
-        If L == 0 returns {}.
-    """
+    """Run an opinion-feature extractor across all L layers and aggregate."""
     if opinion_matrix.ndim != 2 or opinion_matrix.shape[1] == 0:
         return {}
 

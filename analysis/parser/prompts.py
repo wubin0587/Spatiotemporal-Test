@@ -315,6 +315,117 @@ Use a comparison table (if format allows) followed by narrative analysis.
 """
 
 
+
+
+def multi_run_opinion_prompt(
+    mean_summary: Dict[str, Any],
+    std_summary: Dict[str, Any],
+    ci95_summary: Dict[str, Any],
+    n_runs: int,
+    lang: str = "zh",
+    fmt: str = "md",
+) -> str:
+    directives = _directives(lang, fmt)
+    return f"""\
+{directives}
+
+## Task: Analyze Opinion Dynamics Across Replicate Runs
+
+### Number of runs
+{n_runs}
+
+### Mean Summary
+```json
+{_fmt_dict(mean_summary)}
+```
+
+### Cross-run Std Summary
+```json
+{_fmt_dict(std_summary)}
+```
+
+### 95% Confidence Intervals
+```json
+{_fmt_dict(ci95_summary)}
+```
+
+### Instructions
+1. Distinguish robust conclusions (CV < 0.1) from high-variance findings (CV > 0.3).
+2. Add uncertainty qualifiers and confidence-interval references for key claims.
+3. Explain which patterns are likely deterministic vs stochastic across replicate runs.
+4. Conclude with reproducibility assessment and recommended follow-up experiments.
+"""
+
+
+def stability_analysis_prompt(
+    cv_summary: Dict[str, Any],
+    consensus_scores: Dict[str, Any],
+    n_runs: int,
+    lang: str = "zh",
+    fmt: str = "md",
+) -> str:
+    directives = _directives(lang, fmt)
+    return f"""\
+{directives}
+
+## Task: Cross-run Stability Analysis
+
+### Number of runs
+{n_runs}
+
+### Coefficient of Variation Summary
+```json
+{_fmt_dict(cv_summary)}
+```
+
+### Consensus Scores (1-CV)
+```json
+{_fmt_dict(consensus_scores)}
+```
+
+### Instructions
+1. Identify highly stable metrics and explain why they may be parameter-determined.
+2. Identify unstable metrics and explain stochastic sensitivity.
+3. Evaluate overall repeatability of this experiment setup.
+4. Provide practical guidance for how many runs are needed for robust inference.
+"""
+
+
+def parameter_comparison_prompt(
+    sweep_results: Dict[str, Dict],
+    sweep_stds: Dict[str, Dict],
+    focus_metrics: Optional[List[str]] = None,
+    lang: str = "zh",
+    fmt: str = "md",
+) -> str:
+    directives = _directives(lang, fmt)
+    focus_block = _fmt_dict(focus_metrics) if focus_metrics else "Not specified."
+    return f"""\
+{directives}
+
+## Task: Compare Parameter Sweeps (each entry includes replicate runs)
+
+### Focus Metrics
+```json
+{focus_block}
+```
+
+### Mean Summaries by Configuration
+```json
+{_fmt_dict(sweep_results)}
+```
+
+### Std Summaries by Configuration
+```json
+{_fmt_dict(sweep_stds)}
+```
+
+### Instructions
+1. Compare all provided parameter configurations and rank their outcomes on key dimensions.
+2. Highlight differences that remain meaningful after considering uncertainty.
+3. Separate robust cross-configuration effects from noisy effects.
+4. Recommend a preferred parameter regime with evidence-backed reasoning.
+"""
 def narrative_section_prompt(
     section_name: str,
     metrics: Dict[str, Any],
@@ -689,6 +800,12 @@ THEMED_PROMPT_REGISTRY: Dict[str, Any] = {
 
 #: Narrative section registry — maps (section, mode) strings → builders.
 #: Key format: "section:mode", e.g. "opinion:dramatic"
+MULTI_RUN_PROMPT_REGISTRY: Dict[str, Any] = {
+    "multi_run_opinion": multi_run_opinion_prompt,
+    "stability": stability_analysis_prompt,
+    "parameter_comparison": parameter_comparison_prompt,
+}
+
 NARRATIVE_SECTION_REGISTRY: Dict[str, Any] = {
     f"{section}:{mode}": (
         lambda s, m: lambda metrics, lang="zh", fmt="md": (

@@ -14,46 +14,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from analysis.constants import DEFAULT_LANGUAGE
+from .header import lbl, ordered_section_keys, section_label
 from .static_tables import format_metrics_snapshot
-
-
-_LABELS: Dict[str, Dict[str, str]] = {
-    "en": {
-        "executive_summary": "Executive Summary",
-        "opinion":           "Opinion Dynamics",
-        "spatial":           "Spatial Distribution",
-        "topo":              "Network Topology",
-        "event":             "Event Stream",
-        "stability":         "Cross-run Stability",
-        "network_opinion":   "Network--Opinion Coupling",
-        "metrics_snapshot":  "Metrics Snapshot (Final State)",
-        "data_issues":       "Data Quality Warnings",
-        "simulation_meta":   "Simulation Metadata",
-        "section_unknown":   "Additional Analysis",
-    },
-    "zh": {
-        "executive_summary": "执行摘要",
-        "opinion":           "意见动态分析",
-        "spatial":           "空间分布分析",
-        "topo":              "网络拓扑分析",
-        "event":             "事件流分析",
-        "stability":         "多次运行稳定性",
-        "network_opinion":   "网络--意见耦合",
-        "metrics_snapshot":  "终态指标快照",
-        "data_issues":       "数据质量警告",
-        "simulation_meta":   "仿真元数据",
-        "section_unknown":   "补充分析",
-    },
-}
-
-_SECTION_ORDER = [
-    "executive_summary", "opinion", "spatial", "topo",
-    "event", "stability", "network_opinion",
-]
-
-
-def _lbl(key: str, lang: str) -> str:
-    return _LABELS.get(lang, _LABELS["en"]).get(key, key)
 
 
 def render_latex(
@@ -84,40 +46,36 @@ def render_latex(
     if include_toc:
         lines += [r"\tableofcontents", r"\newpage"]
 
-    # Data issues
     if data_issues:
         lines += [
-            r"\section*{" + _tex(_lbl("data_issues", lang)) + "}",
+            r"\section*{" + _tex(lbl("data_issues", lang)) + "}",
             r"\begin{itemize}",
         ]
         for issue in data_issues:
             lines.append(r"\item " + _tex(issue))
         lines.append(r"\end{itemize}")
 
-    # Simulation metadata
     if include_meta and metadata:
-        lines += [r"\section*{" + _tex(_lbl("simulation_meta", lang)) + "}"]
+        lines += [r"\section*{" + _tex(lbl("simulation_meta", lang)) + "}"]
         lines += [r"\begin{description}"]
         for k, v in metadata.items():
             lines.append(r"\item[" + _tex(str(k)) + r"] " + _tex(str(v)))
         lines += [r"\end{description}"]
 
-    # Sections
-    for key in _ordered_keys(sections):
-        label = _lbl(key, lang) if key in _LABELS.get(lang, {}) else _lbl("section_unknown", lang)
-        body  = sections[key].strip()
+    for key in ordered_section_keys(sections):
+        label = section_label(key, lang)
+        body = sections[key].strip()
         lines += [
             r"\section{" + _tex(label) + "}",
             body,
             "",
         ]
 
-    # Metrics snapshot
     if include_snapshot and pipeline_output:
         snap = format_metrics_snapshot(pipeline_output, fmt="latex")
         if snap:
             lines += [
-                r"\section*{" + _tex(_lbl("metrics_snapshot", lang)) + "}",
+                r"\section*{" + _tex(lbl("metrics_snapshot", lang)) + "}",
                 snap,
             ]
 
@@ -145,12 +103,6 @@ def _preamble(use_cjk: bool) -> List[str]:
             r"\setCJKmainfont{Noto Serif CJK SC}",
         ]
     return lines
-
-
-def _ordered_keys(sections: Dict[str, str]) -> List[str]:
-    ordered = [k for k in _SECTION_ORDER if k in sections]
-    extras  = sorted(k for k in sections if k not in _SECTION_ORDER)
-    return ordered + extras
 
 
 def _tex(text: str) -> str:

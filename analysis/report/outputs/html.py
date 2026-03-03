@@ -14,50 +14,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from analysis.constants import DEFAULT_LANGUAGE
+from .header import lbl, ordered_section_keys, section_label
 from .static_tables import format_metrics_snapshot
-
-
-_LABELS: Dict[str, Dict[str, str]] = {
-    "en": {
-        "generated":         "Generated",
-        "executive_summary": "Executive Summary",
-        "opinion":           "Opinion Dynamics",
-        "spatial":           "Spatial Distribution",
-        "topo":              "Network Topology",
-        "event":             "Event Stream",
-        "stability":         "Cross-run Stability",
-        "network_opinion":   "Network–Opinion Coupling",
-        "metrics_snapshot":  "Metrics Snapshot (Final State)",
-        "data_issues":       "Data Quality Warnings",
-        "simulation_meta":   "Simulation Metadata",
-        "ai_mode":           "AI-Assisted Analysis",
-        "static_mode":       "Metric Summary",
-        "toc":               "Contents",
-        "section_unknown":   "Additional Analysis",
-    },
-    "zh": {
-        "generated":         "生成时间",
-        "executive_summary": "执行摘要",
-        "opinion":           "意见动态分析",
-        "spatial":           "空间分布分析",
-        "topo":              "网络拓扑分析",
-        "event":             "事件流分析",
-        "stability":         "多次运行稳定性",
-        "network_opinion":   "网络-意见耦合",
-        "metrics_snapshot":  "终态指标快照",
-        "data_issues":       "数据质量警告",
-        "simulation_meta":   "仿真元数据",
-        "ai_mode":           "AI 辅助分析",
-        "static_mode":       "指标摘要",
-        "toc":               "目录",
-        "section_unknown":   "补充分析",
-    },
-}
-
-_SECTION_ORDER = [
-    "executive_summary", "opinion", "spatial", "topo",
-    "event", "stability", "network_opinion",
-]
 
 _CSS = """
 :root {
@@ -132,10 +90,6 @@ pre.metrics-json   { background: var(--surface); border: 1px solid var(--border)
 """
 
 
-def _lbl(key: str, lang: str) -> str:
-    return _LABELS.get(lang, _LABELS["en"]).get(key, key)
-
-
 def _slug(text: str) -> str:
     import re
     return re.sub(r"[^\w-]", "", text.lower().replace(" ", "-"))
@@ -155,7 +109,7 @@ def render_html(
 ) -> str:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     lang_attr = "zh-CN" if lang == "zh" else "en"
-    mode_label = _lbl("ai_mode" if has_ai else "static_mode", lang)
+    mode_label = lbl("ai_mode" if has_ai else "static_mode", lang)
 
     parts: List[str] = [
         f'<!DOCTYPE html>',
@@ -173,7 +127,7 @@ def render_html(
         f'<header class="report-header">',
         f'  <div class="report-title">{_esc(title)}</div>',
         f'  <div class="report-meta">',
-        f'    {_lbl("generated", lang)}: {ts}',
+        f'    {lbl("generated", lang)}: {ts}',
         f'    <span class="mode-badge">{_esc(mode_label)}</span>',
         f'  </div>',
         f'</header>',
@@ -182,7 +136,7 @@ def render_html(
     # Data issues
     if data_issues:
         parts.append(f'<div class="data-issues">')
-        parts.append(f'  <h2>⚠ {_lbl("data_issues", lang)}</h2><ul>')
+        parts.append(f'  <h2>⚠ {lbl("data_issues", lang)}</h2><ul>')
         for issue in data_issues:
             parts.append(f'  <li>{_esc(issue)}</li>')
         parts.append('  </ul></div>')
@@ -190,25 +144,25 @@ def render_html(
     # Simulation metadata
     if include_meta and metadata:
         parts.append(f'<div class="sim-meta">')
-        parts.append(f'  <h2>{_lbl("simulation_meta", lang)}</h2><ul>')
+        parts.append(f'  <h2>{lbl("simulation_meta", lang)}</h2><ul>')
         for k, v in metadata.items():
             parts.append(f'  <li><strong>{_esc(str(k))}</strong>: {_esc(str(v))}</li>')
         parts.append('  </ul></div>')
 
     # Table of contents
-    ordered_keys = _ordered_keys(sections)
+    ordered_keys = ordered_section_keys(sections)
     if include_toc and ordered_keys:
         parts.append('<nav class="toc">')
-        parts.append(f'  <h2>{_lbl("toc", lang)}</h2><ol>')
+        parts.append(f'  <h2>{lbl("toc", lang)}</h2><ol>')
         for key in ordered_keys:
-            label = _lbl(key, lang) if key in _LABELS.get(lang, {}) else _lbl("section_unknown", lang)
+            label = section_label(key, lang)
             sid = _slug(label)
             parts.append(f'  <li><a href="#{sid}">{_esc(label)}</a></li>')
         parts.append('  </ol></nav>')
 
     # Section bodies
     for key in ordered_keys:
-        label = _lbl(key, lang) if key in _LABELS.get(lang, {}) else _lbl("section_unknown", lang)
+        label = section_label(key, lang)
         sid   = _slug(label)
         body  = sections[key].strip()
         parts += [
@@ -224,19 +178,13 @@ def render_html(
         if snap:
             parts += [
                 f'<div class="metrics-snapshot">',
-                f'  <h2>{_lbl("metrics_snapshot", lang)}</h2>',
+                f'  <h2>{lbl("metrics_snapshot", lang)}</h2>',
                 snap,
                 f'</div>',
             ]
 
     parts += ['</div>', '</body>', '</html>']
     return "\n".join(parts)
-
-
-def _ordered_keys(sections: Dict[str, str]) -> List[str]:
-    ordered = [k for k in _SECTION_ORDER if k in sections]
-    extras  = sorted(k for k in sections if k not in _SECTION_ORDER)
-    return ordered + extras
 
 
 def _esc(text: str) -> str:

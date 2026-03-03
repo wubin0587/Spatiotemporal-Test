@@ -110,4 +110,86 @@ SENTENCES: dict = {
             "Temporal Gini = {gini:.3f}: events are concentrated in short time windows."
         ),
     },
+
+    "stability": {
+        "high_cv": (
+            "Cross-run CV = {cv:.3f} (> 0.15): results show substantial run-to-run "
+            "variability — conclusions should be drawn from ensemble averages."
+        ),
+        "low_cv": (
+            "Cross-run CV = {cv:.3f}: results are highly reproducible across runs."
+        ),
+        "high_spread": (
+            "Inter-run opinion spread = {spread:.3f}: the simulation outcome is "
+            "sensitive to initial conditions or stochastic noise."
+        ),
+        "low_spread": (
+            "Inter-run opinion spread = {spread:.3f}: outcomes are robust across "
+            "different random seeds."
+        ),
+        "all_converged": (
+            "All {n_runs:d} runs converged before the final step — "
+            "the system reliably reaches a stable attractor."
+        ),
+        "partial_converged": (
+            "{n_converged:d} of {n_runs:d} runs converged. "
+            "Some trajectories remained unsettled at simulation end."
+        ),
+        "none_converged": (
+            "No runs converged within the simulation horizon — "
+            "the system dynamics may require a longer time window."
+        ),
+        "stable_polarization": (
+            "Final polarization is consistent across runs "
+            "(mean σ = {pol_mean:.3f}, inter-run std = {pol_std:.3f})."
+        ),
+        "unstable_polarization": (
+            "Final polarization varies substantially across runs "
+            "(mean σ = {pol_mean:.3f}, inter-run std = {pol_std:.3f}), "
+            "suggesting a bistable or chaotic regime."
+        ),
+    },
+
+    "network_opinion": {
+        "high_positive_corr": (
+            "Network–opinion correlation = {corr:.3f}: high-degree nodes "
+            "hold significantly more extreme or aligned opinions."
+        ),
+        "high_negative_corr": (
+            "Network–opinion correlation = {corr:.3f}: high-degree nodes "
+            "tend toward moderate or opposing opinions."
+        ),
+        "low_corr": (
+            "Network–opinion correlation = {corr:.3f}: "
+            "no strong link between network centrality and opinion value."
+        ),
+        "high_community_alignment": (
+            "Community–opinion alignment = {align:.3f}: "
+            "network communities correspond closely to opinion clusters."
+        ),
+        "low_community_alignment": (
+            "Community–opinion alignment = {align:.3f}: "
+            "network structure and opinion clusters are largely independent."
+        ),
+        "hub_influence": (
+            "Top-{k:d} hubs carry mean opinion {hub_mean:.3f} vs "
+            "population mean {pop_mean:.3f} — hubs are pulling {direction} the consensus."
+        ),
+        "strong_echo_chamber": (
+            "Echo-chamber index = {eci:.3f} (> 0.6): agents predominantly "
+            "interact with opinion-similar neighbours."
+        ),
+        "weak_echo_chamber": (
+            "Echo-chamber index = {eci:.3f}: cross-opinion interaction is "
+            "relatively common; echo chambers are weak."
+        ),
+        "high_rewiring": (
+            "Network rewiring rate = {rate:.3f}: significant structural "
+            "change co-evolved with opinion dynamics."
+        ),
+        "low_rewiring": (
+            "Network rewiring rate = {rate:.3f}: topology remained largely "
+            "static throughout the simulation."
+        ),
+    },
 }

@@ -15,6 +15,8 @@ from .composer import (
     summarize_timeseries,
 )
 from .pipeline import FeaturePipeline, run_feature_pipeline
+from .multi_run import MultiRunResult, aggregate_runs
+from .multi_run_pipeline import MultiRunPipeline
 
 __all__ = [
     # extractor
@@ -32,4 +34,8 @@ __all__ = [
     # pipeline
     "FeaturePipeline",
     "run_feature_pipeline",
+    # multi run
+    "MultiRunResult",
+    "aggregate_runs",
+    "MultiRunPipeline",
 ]

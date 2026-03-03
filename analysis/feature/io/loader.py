@@ -21,6 +21,8 @@ from typing import Any, Dict, Union
 
 import numpy as np
 
+from ..multi_run import MultiRunResult
+
 
 def load_features(filepath: Union[str, Path]) -> Dict[str, Any]:
     """
@@ -72,3 +74,39 @@ def _load_npz(path: Path) -> Dict[str, Any]:
 def _load_json(path: Path) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_multi_run_result(dirpath: Union[str, Path], run_label: str = "experiment") -> MultiRunResult:
+    """Load multi-run artifacts from disk and reconstruct MultiRunResult."""
+    in_dir = Path(dirpath)
+    if not in_dir.exists():
+        raise FileNotFoundError(f"Directory not found: {in_dir}")
+
+    mean_summary = _load_json(in_dir / f"{run_label}_mean_summary.json")
+    std_summary = _load_json(in_dir / f"{run_label}_std_summary.json")
+    ci95_summary = _load_json(in_dir / f"{run_label}_ci95_summary.json")
+
+    cv_path = in_dir / f"{run_label}_cv_summary.json"
+    consensus_path = in_dir / f"{run_label}_consensus_summary.json"
+    finals_path = in_dir / f"{run_label}_run_finals.json"
+    metadata_path = in_dir / f"{run_label}_metadata.json"
+
+    cv_summary = _load_json(cv_path) if cv_path.exists() else {}
+    consensus_score = _load_json(consensus_path) if consensus_path.exists() else {}
+    run_finals = _load_json(finals_path) if finals_path.exists() else []
+    metadata = _load_json(metadata_path) if metadata_path.exists() else {}
+
+    n_runs = int(metadata.get("n_runs", 0))
+    layer_idx = int(metadata.get("layer_idx", 0))
+
+    return MultiRunResult(
+        run_summaries=[],
+        run_finals=run_finals,
+        n_runs=n_runs,
+        layer_idx=layer_idx,
+        mean_summary=mean_summary,
+        std_summary=std_summary,
+        cv_summary=cv_summary,
+        ci95_summary=ci95_summary,
+        consensus_score=consensus_score,
+    )

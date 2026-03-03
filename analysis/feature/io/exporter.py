@@ -23,6 +23,8 @@ from typing import Any, Dict, Union
 
 import numpy as np
 
+from ..multi_run import MultiRunResult
+
 
 # ── custom JSON encoder ────────────────────────────────────────────────────
 
@@ -103,6 +105,42 @@ def save_summary(
     if path.suffix != ".json":
         path = path.with_suffix(".json")
     _save_json(summary, path)
+
+
+def save_multi_run_result(
+    result: MultiRunResult,
+    dirpath: Union[str, Path],
+    run_label: str = "experiment",
+):
+    """
+    Save a MultiRunResult to a directory as JSON artifacts.
+
+    Output files
+    ------------
+    {run_label}_mean_summary.json
+    {run_label}_std_summary.json
+    {run_label}_ci95_summary.json
+    {run_label}_cv_summary.json
+    {run_label}_consensus_summary.json
+    {run_label}_run_finals.json
+    {run_label}_metadata.json
+    """
+    out_dir = Path(dirpath)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    _save_json(result.mean_summary, out_dir / f"{run_label}_mean_summary.json")
+    _save_json(result.std_summary, out_dir / f"{run_label}_std_summary.json")
+    _save_json(result.ci95_summary, out_dir / f"{run_label}_ci95_summary.json")
+    _save_json(result.cv_summary, out_dir / f"{run_label}_cv_summary.json")
+    _save_json(result.consensus_score, out_dir / f"{run_label}_consensus_summary.json")
+    _save_json(result.run_finals, out_dir / f"{run_label}_run_finals.json")
+
+    metadata = {
+        "n_runs": result.n_runs,
+        "layer_idx": result.layer_idx,
+        "has_percentile_summary": bool(result.percentile_summary),
+    }
+    _save_json(metadata, out_dir / f"{run_label}_metadata.json")
 
 
 # ── private helpers ────────────────────────────────────────────────────────

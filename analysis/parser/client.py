@@ -39,12 +39,17 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 
+from analysis.feature.multi_run import MultiRunResult
+
 from .prompts import (
     SYSTEM_PROMPT,
     SECTION_PROMPT_REGISTRY,
     trend_summary_prompt,
     comparative_prompt,
     narrative_section_prompt,
+    multi_run_opinion_prompt,
+    stability_analysis_prompt,
+    parameter_comparison_prompt,
     _fmt_dict,
 )
 
@@ -309,6 +314,87 @@ class ParserClient:
             max_tokens=self.max_tokens,
         )
 
+
+    def parse_multi_run_result(
+        self,
+        multi_run_result: MultiRunResult,
+        include_stability_analysis: bool = True,
+        include_executive_summary: bool = True,
+        simulation_meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, str]:
+        """Parse an aggregated MultiRunResult into section narratives."""
+        section_summaries = _partition_summary(multi_run_result.mean_summary)
+        results: Dict[str, str] = {}
+
+        for section in self.sections:
+            sec_mean = section_summaries.get(section, {})
+            if not sec_mean:
+                continue
+
+            sec_std = _partition_summary(multi_run_result.std_summary).get(section, {})
+            sec_ci95 = _partition_summary(multi_run_result.ci95_summary).get(section, {})
+            enriched = _enrich_with_multi_run_stats(sec_mean, sec_std, sec_ci95)
+
+            if section == "opinion":
+                user_prompt = multi_run_opinion_prompt(
+                    mean_summary=enriched,
+                    std_summary=sec_std,
+                    ci95_summary=sec_ci95,
+                    n_runs=multi_run_result.n_runs,
+                    lang=self.lang,
+                    fmt=self.fmt,
+                )
+                results[section] = self._backend.call(
+                    system=SYSTEM_PROMPT,
+                    user=user_prompt,
+                    max_tokens=self.max_tokens,
+                )
+            else:
+                results[section] = self.parse_section(section, enriched)
+
+        if include_stability_analysis:
+            user_prompt = stability_analysis_prompt(
+                cv_summary=multi_run_result.cv_summary,
+                consensus_scores=multi_run_result.consensus_score,
+                n_runs=multi_run_result.n_runs,
+                lang=self.lang,
+                fmt=self.fmt,
+            )
+            results["stability"] = self._backend.call(
+                system=SYSTEM_PROMPT,
+                user=user_prompt,
+                max_tokens=self.max_tokens,
+            )
+
+        if include_executive_summary and multi_run_result.mean_summary:
+            results["executive_summary"] = self._call_trend_summary(
+                multi_run_result.mean_summary,
+                simulation_meta,
+            )
+
+        return results
+
+    def compare_parameter_sweeps(
+        self,
+        results_map: Dict[str, MultiRunResult],
+        focus_metrics: Optional[List[str]] = None,
+    ) -> str:
+        """Compare multiple parameter configurations, each represented by MultiRunResult."""
+        sweep_results = {k: v.mean_summary for k, v in results_map.items()}
+        sweep_stds = {k: v.std_summary for k, v in results_map.items()}
+
+        user_prompt = parameter_comparison_prompt(
+            sweep_results=sweep_results,
+            sweep_stds=sweep_stds,
+            focus_metrics=focus_metrics,
+            lang=self.lang,
+            fmt=self.fmt,
+        )
+        return self._backend.call(
+            system=SYSTEM_PROMPT,
+            user=user_prompt,
+            max_tokens=self.max_tokens,
+        )
     def parse_custom(
         self,
         section_name: str,
@@ -369,3 +455,24 @@ def _partition_summary(
         partitioned.setdefault(section, {})[metric] = val
 
     return partitioned
+
+def _enrich_with_multi_run_stats(
+    mean_summary: Dict[str, Any],
+    std_summary: Dict[str, Any],
+    ci95_summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Inject run-level uncertainty fields into summary metric dicts."""
+    out: Dict[str, Any] = {}
+    for metric, payload in mean_summary.items():
+        if isinstance(payload, dict):
+            merged = dict(payload)
+            merged["run_std"] = std_summary.get(metric, {})
+            merged["ci95"] = ci95_summary.get(metric, {})
+            out[metric] = merged
+        else:
+            out[metric] = {
+                "mean": payload,
+                "run_std": std_summary.get(metric),
+                "ci95": ci95_summary.get(metric),
+            }
+    return out

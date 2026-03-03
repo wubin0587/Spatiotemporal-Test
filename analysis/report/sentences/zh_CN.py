@@ -106,4 +106,29 @@ SENTENCES: dict = {
             "时间基尼系数 = {gini:.3f}，事件高度集中于少数时间窗口内。"
         ),
     },
+
+    "stability": {
+        "high_cv":   "跨次运行变异系数 CV = {cv:.3f}（> 0.15），结果在不同运行间波动明显，建议基于集成均值得出结论。",
+        "low_cv":    "跨次运行变异系数 CV = {cv:.3f}，结果在不同运行间高度可复现。",
+        "high_spread": "跨次意见散度 = {spread:.3f}，仿真结果对初始条件或随机噪声较为敏感。",
+        "low_spread":  "跨次意见散度 = {spread:.3f}，不同随机种子下结果鲁棒性良好。",
+        "all_converged":     "全部 {n_runs:d} 次运行均在终止步之前收敛，系统能可靠地到达稳定吸引子。",
+        "partial_converged": "{n_runs:d} 次运行中有 {n_converged:d} 次收敛，部分轨迹在仿真结束时仍未稳定。",
+        "none_converged":    "在给定仿真时域内无任何运行收敛，系统动态可能需要更长的时间窗口。",
+        "stable_polarization":   "终态极化在各次运行间保持一致（均值 σ = {pol_mean:.3f}，跨次标准差 = {pol_std:.3f}）。",
+        "unstable_polarization": "终态极化在各次运行间差异显著（均值 σ = {pol_mean:.3f}，跨次标准差 = {pol_std:.3f}），表明系统可能处于双稳态或混沌区间。",
+    },
+
+    "network_opinion": {
+        "high_positive_corr":       "网络-意见相关系数 = {corr:.3f}，度数较高的节点持有显著更极端或更趋同的意见。",
+        "high_negative_corr":       "网络-意见相关系数 = {corr:.3f}，度数较高的节点倾向于持温和或对立意见。",
+        "low_corr":                  "网络-意见相关系数 = {corr:.3f}，网络中心性与意见值之间无显著关联。",
+        "high_community_alignment": "社区-意见对齐度 = {align:.3f}，网络社区结构与意见聚类高度吻合。",
+        "low_community_alignment":  "社区-意见对齐度 = {align:.3f}，网络结构与意见聚类基本相互独立。",
+        "hub_influence":             "前 {k:d} 个枢纽节点的意见均值为 {hub_mean:.3f}，整体均值为 {pop_mean:.3f}——枢纽节点正在{direction}共识形成。",
+        "strong_echo_chamber":       "回声室指数 = {eci:.3f}（> 0.6），智能体主要与意见相近的邻居互动。",
+        "weak_echo_chamber":         "回声室指数 = {eci:.3f}，跨意见交互较为普遍，回声室效应较弱。",
+        "high_rewiring":             "网络重连率 = {rate:.3f}，拓扑结构随意见动态发生了显著的共演化变化。",
+        "low_rewiring":              "网络重连率 = {rate:.3f}，仿真全程拓扑结构基本保持稳定。",
+    },
 }

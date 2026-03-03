@@ -23,7 +23,7 @@ from typing import Any, Dict, Union
 
 import numpy as np
 
-from ..multi_run import MultiRunResult
+from ..multi import MultiRunResult
 
 
 # ── custom JSON encoder ────────────────────────────────────────────────────

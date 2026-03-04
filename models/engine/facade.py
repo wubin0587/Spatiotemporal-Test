@@ -13,7 +13,7 @@ import yaml
 import json
 import copy
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Protocol, Union
 
 import numpy as np
 import networkx as nx
@@ -22,6 +22,13 @@ import networkx as nx
 from .steps import StepExecutor
 
 logger = logging.getLogger(__name__)
+
+
+class InterventionHook(Protocol):
+    """Protocol for optional intervention managers injected into the facade."""
+
+    def evaluate_and_apply(self, engine: StepExecutor, stats: Dict[str, Any]) -> None:
+        """Evaluate conditions and apply interventions to the given engine state."""
 
 
 class SimulationFacade:
@@ -66,6 +73,7 @@ class SimulationFacade:
         self.config = config
         self._validate_config_schema()
         self._engine: Optional[StepExecutor] = None
+        self._intervention_manager: Optional[InterventionHook] = None
         self._initialized: bool = False
         self._results: Optional[Dict[str, Any]] = None
         
@@ -225,6 +233,21 @@ class SimulationFacade:
     # =========================================================================
     # Simulation Execution
     # =========================================================================
+
+    def set_intervention_manager(self, manager: Optional[InterventionHook]) -> None:
+        """
+        Register (or clear) an intervention manager hook.
+
+        The manager should implement `evaluate_and_apply(engine, stats)`.
+
+        Args:
+            manager: Intervention manager instance, or None to disable hooks.
+        """
+        self._intervention_manager = manager
+
+    def get_intervention_manager(self) -> Optional[InterventionHook]:
+        """Return the currently registered intervention manager hook."""
+        return self._intervention_manager
     
     def run(self, num_steps: Optional[int] = None, 
             auto_initialize: bool = True) -> Dict[str, Any]:
@@ -258,10 +281,33 @@ class SimulationFacade:
             else:
                 raise RuntimeError("Simulation not initialized. Call initialize() first.")
         
-        # Execute simulation
-        logger.info("Starting simulation execution...")
-        self._results = self._engine.run(num_steps=num_steps)
-        
+        if num_steps is None:
+            num_steps = self._engine.total_steps
+
+        # If no intervention hook is configured, preserve original engine run path.
+        if self._intervention_manager is None:
+            logger.info("Starting simulation execution...")
+            self._results = self._engine.run(num_steps=num_steps)
+            logger.info(f"Simulation completed: {self._results['total_steps']} steps")
+            return self._results
+
+        # Hook-enabled execution path: step through facade so hook runs each tick.
+        logger.info("Starting simulation execution with intervention hook...")
+        for _ in range(num_steps):
+            self.step(auto_initialize=False)
+
+        self._results = {
+            'final_time': self._engine.current_time,
+            'total_steps': self._engine.time_step,
+            'final_opinions': self._engine.opinion_matrix.copy(),
+            'final_positions': self._engine.agent_positions.copy(),
+            'final_impact': self._engine.impact_vector.copy(),
+            'config': self.config
+        }
+
+        if self._engine.sim_config.get('record_history', False):
+            self._results['history'] = self._engine.history
+
         logger.info(f"Simulation completed: {self._results['total_steps']} steps")
         
         return self._results
@@ -293,7 +339,16 @@ class SimulationFacade:
                 raise RuntimeError("Simulation not initialized. Call initialize() first.")
         
         # Execute one step
-        return self._engine.step()
+        stats = self._engine.step()
+
+        # Optional intervention hook on each step.
+        if self._intervention_manager is not None:
+            self._intervention_manager.evaluate_and_apply(
+                engine=self._engine,
+                stats=stats
+            )
+
+        return stats
     
     def reset(self):
         """

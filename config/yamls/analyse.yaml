@@ -1,0 +1,53 @@
+output:
+  dir: output
+  formats:
+    - md
+  lang: zh
+  save_figures: true
+  save_timeseries: true
+  save_features_json: true
+
+feature:
+  enabled: true
+  layer_idx: 0
+  include_trends: true
+
+parser:
+  enabled: false
+  api_key: ""
+  model: gpt-4o
+  base_url:
+  lang: zh
+  fmt: md
+  sections:
+    - opinion
+    - spatial
+    - topo
+    - event
+  include_executive_summary: true
+  max_tokens: 2048
+  narrative_mode:
+  theme:
+
+report:
+  enabled: true
+  formats:
+    - md
+  include_toc: true
+  include_meta: true
+  include_snapshot: true
+  title:
+
+visual:
+  enabled: false
+  dashboard: true
+  opinion_distribution: true
+  spatial_opinions: true
+  opinion_timeseries: true
+  impact_heatmap: false
+  event_timeline: true
+  polarization_evolution: true
+  network_homophily: false
+  dpi: 150
+
+simulation_meta: {}

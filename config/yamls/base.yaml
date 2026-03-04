@@ -10,3 +10,5 @@ events:
 networks:
   builder:
 spatial:
+analyse:
+

@@ -35,6 +35,44 @@ Subclassing
 
         def describe(self):
             return "MyPolicy: does something specific"
+
+Registry
+--------
+All concrete policy types are registered in ``_REGISTRY`` (at the bottom of
+this module) as ``policy_type_string → (module_path, class_name)`` tuples.
+The ``from_config`` factory uses this registry for lazy-import dispatch.
+
+Available policy types
+----------------------
+Event policies (intervention.policies.event):
+    event_suppress      -- Disable an event generator for N steps
+    event_inject        -- Inject a synthetic event into the archive
+    event_amplify       -- Scale existing event intensities by a factor
+    event_filter        -- Remove events outside polarity/intensity bounds
+
+Network policies (intervention.policies.network):
+    network_rewire       -- Random edge rewiring
+    network_remove_edges -- Sever cross-group connections
+    network_add_edges    -- Add bridging edges between groups
+    network_isolate      -- Remove all edges for target agents
+
+Spatial policies (intervention.policies.spatial):
+    agent_relocate       -- Teleport agents to a new position
+    spatial_cluster      -- Pull agents towards a focal point
+    spatial_dispersal    -- Push agents away from a focal point
+    spatial_barrier      -- Reflect agents that cross a boundary
+
+Temporal / dynamics policies (intervention.policies.time):
+    dynamics_param       -- Override epsilon/mu and related parameters
+    simulation_speed     -- Change dt per step
+    opinion_clamp        -- Hard-clamp opinions to a range
+    opinion_nudge        -- Soft signed shift on selected opinions
+
+Multilayer policies (intervention.policies.multilayer):
+    layer_coupling       -- Drag target-layer opinions towards source layer
+    layer_weight         -- Set per-layer update multipliers
+    layer_reset          -- Re-randomise one opinion layer
+    layer_polarise       -- Push layer opinions towards nearest extreme
 """
 
 from __future__ import annotations
@@ -45,6 +83,47 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# Registry — maps YAML type strings to (module_path, class_name)
+# =============================================================================
+
+_REGISTRY: Dict[str, tuple] = {
+    # --- Event policies ---
+    "event_suppress":       ("intervention.policies.event",      "EventSuppressPolicy"),
+    "event_inject":         ("intervention.policies.event",      "EventInjectPolicy"),
+    "event_amplify":        ("intervention.policies.event",      "EventAmplifyPolicy"),
+    "event_filter":         ("intervention.policies.event",      "EventFilterPolicy"),
+
+    # --- Network policies ---
+    "network_rewire":       ("intervention.policies.network",    "NetworkRewirePolicy"),
+    "network_remove_edges": ("intervention.policies.network",    "NetworkRemoveEdgesPolicy"),
+    "network_add_edges":    ("intervention.policies.network",    "NetworkAddEdgesPolicy"),
+    "network_isolate":      ("intervention.policies.network",    "NetworkIsolatePolicy"),
+
+    # --- Spatial policies ---
+    "agent_relocate":       ("intervention.policies.spatial",    "AgentRelocationPolicy"),
+    "spatial_cluster":      ("intervention.policies.spatial",    "SpatialClusterPolicy"),
+    "spatial_dispersal":    ("intervention.policies.spatial",    "SpatialDispersalPolicy"),
+    "spatial_barrier":      ("intervention.policies.spatial",    "SpatialBarrierPolicy"),
+
+    # --- Temporal / dynamics policies ---
+    "dynamics_param":       ("intervention.policies.time",       "DynamicsParamPolicy"),
+    "simulation_speed":     ("intervention.policies.time",       "SimulationSpeedPolicy"),
+    "opinion_clamp":        ("intervention.policies.time",       "OpinionClampPolicy"),
+    "opinion_nudge":        ("intervention.policies.time",       "OpinionNudgePolicy"),
+
+    # --- Multilayer policies ---
+    "layer_coupling":       ("intervention.policies.multilayer", "LayerCouplingPolicy"),
+    "layer_weight":         ("intervention.policies.multilayer", "LayerWeightPolicy"),
+    "layer_reset":          ("intervention.policies.multilayer", "LayerResetPolicy"),
+    "layer_polarise":       ("intervention.policies.multilayer", "LayerPolarisePolicy"),
+}
+
+
+# =============================================================================
+# BasePolicy
+# =============================================================================
 
 class BasePolicy(ABC):
     """
@@ -180,17 +259,10 @@ class BasePolicy(ABC):
         """
         policy_type = cfg.get("type", "").lower()
 
-        # Registry of available policy types → (module_path, class_name)
-        # Populated as concrete policies are implemented.
-        _REGISTRY: Dict[str, tuple] = {
-            # e.g. "network_rewire": ("intervention.policies.network", "NetworkRewirePolicy"),
-            # Entries will be added as policies are implemented.
-        }
-
         if policy_type not in _REGISTRY:
             raise ValueError(
                 f"Unknown policy type: '{policy_type}'. "
-                f"Available: {list(_REGISTRY.keys())}"
+                f"Available: {sorted(_REGISTRY.keys())}"
             )
 
         module_path, class_name = _REGISTRY[policy_type]
@@ -198,6 +270,11 @@ class BasePolicy(ABC):
         module = importlib.import_module(module_path)
         policy_cls = getattr(module, class_name)
         return policy_cls(config=cfg, name=cfg.get("name"))
+
+    @classmethod
+    def list_available(cls) -> List[str]:
+        """Return a sorted list of all registered policy type strings."""
+        return sorted(_REGISTRY.keys())
 
     def __repr__(self) -> str:
         return (

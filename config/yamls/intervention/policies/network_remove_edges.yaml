@@ -1,0 +1,5 @@
+type: network_remove_edges
+group_a: [0, 1, 2]
+group_b: [3, 4, 5]
+opinion_split: false
+name: remove_between_groups

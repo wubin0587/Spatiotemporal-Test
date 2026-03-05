@@ -1,0 +1,4 @@
+type: burst
+start: 40
+end: 60
+prob: 0.5

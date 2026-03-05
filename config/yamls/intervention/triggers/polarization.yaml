@@ -1,0 +1,5 @@
+type: polarization
+threshold: 0.4
+cooldown: 20
+max_fires: 0
+name: polarization_high

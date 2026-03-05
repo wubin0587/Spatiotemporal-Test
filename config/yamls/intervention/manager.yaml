@@ -1,0 +1,28 @@
+interventions:
+  - label: network_rewire_at_100
+    auto_checkpoint: true
+    trigger:
+      type: step
+      step: 100
+      cooldown: 0
+      max_fires: 1
+      name: step_100
+    policy:
+      type: network_rewire
+      fraction: 0.1
+      seed: 2024
+      name: rewire_10pct
+
+  - label: suppress_events_on_polarization
+    auto_checkpoint: false
+    trigger:
+      type: polarization
+      threshold: 0.4
+      cooldown: 20
+      max_fires: 0
+      name: high_polarization
+    policy:
+      type: event_suppress
+      source: exogenous
+      duration: 10
+      name: suppress_exogenous_10_steps

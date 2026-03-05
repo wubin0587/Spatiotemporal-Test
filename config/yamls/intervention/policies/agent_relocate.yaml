@@ -1,0 +1,6 @@
+type: agent_relocate
+agents: [0, 1, 2]
+top_k_by_impact: 0
+destination: [0.5, 0.5]
+seed: 2024
+name: relocate_selected_agents

@@ -1,0 +1,8 @@
+type: event_inject
+location: [0.5, 0.5]
+intensity: 10.0
+content: [0.34, 0.33, 0.33]
+polarity: 0.0
+source: intervention
+spatial_sigma: 0.1
+name: inject_center_event

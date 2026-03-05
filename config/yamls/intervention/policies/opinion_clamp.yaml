@@ -1,0 +1,7 @@
+type: opinion_clamp
+layer: -1
+min_value: 0.0
+max_value: 1.0
+agents: null
+top_k_by_impact: 0
+name: clamp_all_layers

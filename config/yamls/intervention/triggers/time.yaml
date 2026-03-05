@@ -1,0 +1,5 @@
+type: time
+time: 50.0
+cooldown: 0
+max_fires: 1
+name: time_50

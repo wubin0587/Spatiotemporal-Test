@@ -1,0 +1,5 @@
+type: cyclic
+period: 24.0
+amplitude: 0.02
+base_rate: 0.05
+phase: 0.0

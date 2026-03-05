@@ -1,0 +1,5 @@
+type: spatial_barrier
+axis: x
+value: 0.5
+side: left
+name: x_left_barrier

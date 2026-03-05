@@ -1,0 +1,5 @@
+type: impact
+threshold: 0.3
+cooldown: 10
+max_fires: 0
+name: impact_high

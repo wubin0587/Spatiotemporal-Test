@@ -1,0 +1,7 @@
+type: opinion_nudge
+layer:
+delta:
+direction:
+agents:
+top_k_by_impact:
+name:

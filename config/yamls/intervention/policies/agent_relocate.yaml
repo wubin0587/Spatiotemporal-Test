@@ -1,0 +1,6 @@
+type: agent_relocate
+agents:
+destination:
+region:
+seed:
+name:

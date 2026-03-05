@@ -1,0 +1,7 @@
+type: opinion_clamp
+layer:
+min_value:
+max_value:
+agents:
+top_k_by_impact:
+name:

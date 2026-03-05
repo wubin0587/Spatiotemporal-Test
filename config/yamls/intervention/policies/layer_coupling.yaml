@@ -1,0 +1,6 @@
+type: layer_coupling
+source_layer:
+target_layer:
+coupling_strength:
+agents:
+name:

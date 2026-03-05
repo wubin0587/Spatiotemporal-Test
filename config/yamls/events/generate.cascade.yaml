@@ -1,0 +1,14 @@
+enabled:
+seed:
+time_decay_alpha:
+space_decay_beta:
+mu_multiplier:
+background_lambda:
+temporal_window:
+max_spawn_distance:
+content_mutation:
+polarity_mutation:
+attributes:
+  intensity:
+  diffusion:
+  lifecycle:

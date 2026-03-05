@@ -1,0 +1,13 @@
+enabled:
+seed:
+monitor_attribute:
+critical_threshold:
+grid_resolution:
+min_agents_in_cell:
+cooldown:
+attributes:
+  intensity:
+  content:
+  polarity:
+  diffusion:
+  lifecycle:

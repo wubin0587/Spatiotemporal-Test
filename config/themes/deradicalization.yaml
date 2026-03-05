@@ -1,0 +1,118 @@
+# config/themes/deradicalization.yaml
+#
+# 场景：去极端化干预实验
+#
+# 特征：
+#   - 初始状态：已极化的群体（双峰分布）
+#   - 重点在 intervention：多种去极端化政策对照
+#   - 干预时机研究：早期 vs 中期 vs 晚期
+#   - auto_checkpoint 全开，支持反事实对比
+#   - 研究关注：哪种干预最有效、副作用（过度收敛）
+
+_meta:
+  label: 去极端化干预实验
+  description: >
+    去极端化政策评估场景。系统初始已极化，通过多种干预
+    （网络重连、意见推拉、事件压制）进行对照实验，
+    auto_checkpoint 全开支持反事实分析。
+  scenario: deradicalization
+  tags: [intervention, deradicalization, counterfactual, policy]
+
+_presets:
+  networks.builder:       small_world
+  spatial.distributions:  clustered
+  engine.interface:       polarized
+
+_overrides:
+  engine.interface.agents.num_agents:        300
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params.split: 0.5
+
+  engine.interface.simulation.total_steps:   600
+  engine.interface.simulation.seed:          1010
+
+  engine.maths.dynamics.epsilon_base:   0.20
+  engine.maths.dynamics.mu_base:        0.30
+  engine.maths.dynamics.alpha_mod:      0.25
+  engine.maths.dynamics.beta_mod:       0.15
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             5.5
+  engine.maths.field.beta:              0.07
+  engine.maths.field.temporal_window:   150.0
+
+  engine.maths.topo.threshold:          0.22
+  engine.maths.topo.radius_base:        0.06
+  engine.maths.topo.radius_dynamic:     0.14
+
+  networks.builder.params.n:  300
+  networks.builder.params.k:  8
+  networks.builder.params.p:  0.08
+
+  spatial.distribution.n_clusters:  4
+  spatial.distribution.cluster_std: 0.10
+
+  # 外生：低强度背景（被干预政策管控）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     1010
+  events.generation.exogenous.time_trigger.lambda_rate: 0.12
+  events.generation.exogenous.attributes.intensity.min_val: 3.0
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.80
+  events.generation.exogenous.attributes.lifecycle.fast_range: [2, 6]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [10, 25]
+
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
+  events.generation.endogenous_threshold.critical_threshold: 0.65
+  events.generation.endogenous_threshold.grid_resolution:    15
+  events.generation.endogenous_threshold.min_agents_in_cell: 4
+  events.generation.endogenous_threshold.cooldown:           35
+
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.55
+  events.generation.endogenous_cascade.background_lambda: 0.0
+
+  # 干预配置（三波次，全部开 auto_checkpoint）
+  intervention.interventions:
+    - label: early_rewire
+      auto_checkpoint: true
+      trigger:
+        type: step
+        step: 100
+        max_fires: 1
+      policy:
+        type: network_rewire
+        fraction: 0.15
+        seed: 42
+
+    - label: derad_nudge_on_polarization
+      auto_checkpoint: true
+      trigger:
+        type: polarization
+        threshold: 0.35
+        cooldown: 30
+        max_fires: 3
+      policy:
+        type: opinion_nudge
+        layer: -1
+        delta: 0.05
+        direction: center
+
+    - label: suppress_extreme_events
+      auto_checkpoint: false
+      trigger:
+        type: impact
+        threshold: 0.40
+        cooldown: 20
+        max_fires: 0
+      policy:
+        type: event_suppress
+        source: endogenous_threshold
+        duration: 15
+
+_analyse_overrides:
+  parser.narrative_mode: comparative
+  parser.theme: deradicalization
+  visual.network_homophily: true
+  visual.polarization_evolution: true
+  report.title: 去极端化干预效果对照分析

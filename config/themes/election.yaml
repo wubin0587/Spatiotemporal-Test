@@ -1,0 +1,81 @@
+# config/themes/election.yaml
+#
+# 场景：选举期间舆论演化
+#
+# 特征：
+#   - 时间结构明确：竞选期 → 辩论/丑闻冲击 → 投票日 → 结果
+#   - 意见在连续轴上摇摆（支持率波动），非简单极化
+#   - 外部事件有明确时间节点（辩论、丑闻、民调发布）
+#   - 摇摆选民群体：中间意见者受事件冲击最大
+#   - 研究关注：关键事件的舆论冲击量、undecided 群体动态
+
+_meta:
+  label: 选举期间舆论演化
+  description: >
+    选举竞选期场景。时间轴上有离散的关键事件节点（辩论、丑闻），
+    重点研究摇摆群体的意见轨迹与关键事件的冲击量化。
+  scenario: election
+  tags: [election, opinion_dynamics, swing_voters, event_driven]
+
+_presets:
+  networks.builder:       small_world
+  spatial.distributions:  gaussian
+  engine.interface:       normal
+
+_overrides:
+  engine.interface.agents.num_agents:        400
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params.mean: 0.5
+  engine.interface.agents.initial_opinions.params.std:  0.25
+
+  engine.interface.simulation.total_steps:   600
+  engine.interface.simulation.seed:          707
+
+  engine.maths.dynamics.epsilon_base:   0.28
+  engine.maths.dynamics.mu_base:        0.32
+  engine.maths.dynamics.alpha_mod:      0.30
+  engine.maths.dynamics.beta_mod:       0.15
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             6.0
+  engine.maths.field.beta:              0.08
+  engine.maths.field.temporal_window:   150.0
+
+  engine.maths.topo.threshold:          0.28
+  engine.maths.topo.radius_base:        0.06
+  engine.maths.topo.radius_dynamic:     0.15
+
+  networks.builder.params.n:  400
+  networks.builder.params.k:  10
+  networks.builder.params.p:  0.10
+
+  # 外生事件：辩论/丑闻（爆发式，强度大，时间集中）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     707
+  events.generation.exogenous.time_trigger.type:        poisson
+  events.generation.exogenous.time_trigger.lambda_rate: 0.15
+  events.generation.exogenous.attributes.intensity.type:      pareto
+  events.generation.exogenous.attributes.intensity.shape:     1.8   # 重尾：偶有超级事件
+  events.generation.exogenous.attributes.intensity.min_val:   5.0
+  events.generation.exogenous.attributes.polarity.min:        -0.9
+  events.generation.exogenous.attributes.polarity.max:        0.9
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.6
+  events.generation.exogenous.attributes.lifecycle.fast_range: [5, 20]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [30, 80]
+
+  # 内生阈值：意见极端化触发（支持者/反对者各自强化）
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
+  events.generation.endogenous_threshold.critical_threshold: 0.55
+  events.generation.endogenous_threshold.grid_resolution:    15
+  events.generation.endogenous_threshold.min_agents_in_cell: 5
+  events.generation.endogenous_threshold.cooldown:           35
+
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.55
+  events.generation.endogenous_cascade.background_lambda: 0.01
+
+_analyse_overrides:
+  parser.narrative_mode: chronicle
+  parser.theme: election
+  report.title: 选举期间舆论演化动力学分析

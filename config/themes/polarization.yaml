@@ -1,0 +1,83 @@
+# config/themes/polarization.yaml
+#
+# 场景：社会两极分化（慢性、结构性）
+#
+# 特征：
+#   - 意见空间逐渐从单峰分布演化为双峰
+#   - 内生方差触发（混合区域冲突）
+#   - 网络同质化（相似者聚集）随时间加剧
+#   - 无明显单一触发事件，是长期累积过程
+#   - 研究关注：分化速度、稳定双峰结构、破坏回音壁的干预
+
+_meta:
+  label: 社会两极分化（慢性）
+  description: >
+    长期结构性两极分化场景。初始意见中等分散，随时间演化为
+    稳定双峰结构，重点研究分化临界条件与网络重连干预效果。
+  scenario: polarization
+  tags: [polarization, bimodal, long_run, network_homophily]
+
+_presets:
+  networks.builder:       small_world
+  spatial.distributions:  gaussian
+  engine.interface:       normal
+
+_overrides:
+  engine.interface.agents.num_agents:        400
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params.mean: 0.5
+  engine.interface.agents.initial_opinions.params.std:  0.22
+
+  engine.interface.simulation.total_steps:   1000
+  engine.interface.simulation.seed:          505
+
+  engine.maths.dynamics.epsilon_base:   0.22
+  engine.maths.dynamics.mu_base:        0.28
+  engine.maths.dynamics.alpha_mod:      0.20
+  engine.maths.dynamics.beta_mod:       0.12
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             5.0
+  engine.maths.field.beta:              0.07
+  engine.maths.field.temporal_window:   200.0
+
+  engine.maths.topo.threshold:          0.22
+  engine.maths.topo.radius_base:        0.06
+  engine.maths.topo.radius_dynamic:     0.15
+
+  networks.builder.params.n:  400
+  networks.builder.params.k:  8
+  networks.builder.params.p:  0.08
+
+  spatial.distribution.mean:    [0.5, 0.5]
+  spatial.distribution.std_dev: [0.20, 0.20]
+
+  # 内生阈值：意见方差触发（混合区冲突，核心机制）
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  opinion_variance
+  events.generation.endogenous_threshold.critical_threshold: 0.45
+  events.generation.endogenous_threshold.grid_resolution:    15
+  events.generation.endogenous_threshold.min_agents_in_cell: 5
+  events.generation.endogenous_threshold.cooldown:           40
+  events.generation.endogenous_threshold.attributes.intensity.base_value:   10.0
+  events.generation.endogenous_threshold.attributes.intensity.scale_factor: 12.0
+  events.generation.endogenous_threshold.attributes.content.amplify_dominant: false
+
+  # 外生：低强度背景媒体事件
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     505
+  events.generation.exogenous.time_trigger.lambda_rate: 0.15
+  events.generation.exogenous.attributes.intensity.min_val: 3.0
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.75
+  events.generation.exogenous.attributes.lifecycle.fast_range: [3, 8]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [20, 50]
+
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.50
+  events.generation.endogenous_cascade.background_lambda: 0.0
+
+_analyse_overrides:
+  parser.narrative_mode: predictive
+  parser.theme: polarization
+  visual.network_homophily: true     # 极化研究必看同质化指标
+  report.title: 社会两极分化演化动力学分析

@@ -1,0 +1,90 @@
+# config/themes/urban_crowd.yaml
+#
+# 场景：城市日常人群聚集（商业区 / 节假日 / 赛事）
+#
+# 特征：
+#   - 空间结构复杂：城市核心 + 卫星商圈
+#   - 人群流动性高，偶遇交互为主（非强关系网络）
+#   - 事件强度中等、生命周期短（短暂热点）
+#   - 意见分散、无强极化趋势（背景噪声场景）
+#   - 研究关注：人群聚集密度动态、热点空间分布、弱关系传播
+
+_meta:
+  label: 城市日常人群聚集
+  description: >
+    城市节假日或大型赛事期间人群聚集场景。空间呈卫星城结构，
+    弱关系偶遇交互主导，研究热点空间分布与弱连接信息传播。
+  scenario: urban_crowd
+  tags: [urban, crowd, spatial, weak_ties, daily_life]
+
+_presets:
+  networks.builder:       random_geometric   # 地理邻近连接
+  spatial.distributions:  satellite
+  engine.interface:       uniform
+
+_overrides:
+  engine.interface.agents.num_agents:        600
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params: {}
+
+  engine.interface.simulation.total_steps:   400
+  engine.interface.simulation.seed:          808
+
+  engine.maths.dynamics.epsilon_base:   0.35
+  engine.maths.dynamics.mu_base:        0.25
+  engine.maths.dynamics.alpha_mod:      0.20
+  engine.maths.dynamics.beta_mod:       0.10
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             7.0
+  engine.maths.field.beta:              0.10
+  engine.maths.field.temporal_window:   80.0
+
+  engine.maths.topo.threshold:          0.35
+  engine.maths.topo.radius_base:        0.05
+  engine.maths.topo.radius_dynamic:     0.12
+
+  networks.builder.params.n:      600
+  networks.builder.params.radius: 0.06
+
+  # 空间：主城区 + 两个卫星商圈
+  spatial.distribution.main_city.center:     [0.52, 0.52]
+  spatial.distribution.main_city.proportion: 0.65
+  spatial.distribution.main_city.std_dev:    0.12
+  spatial.distribution.satellites:
+    - center: [0.18, 0.75]
+      proportion: 0.20
+      std_dev: 0.06
+    - center: [0.80, 0.25]
+      proportion: 0.15
+      std_dev: 0.05
+
+  # 外生事件：中等频率，短生命周期热点
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     808
+  events.generation.exogenous.time_trigger.lambda_rate: 0.30
+  events.generation.exogenous.attributes.intensity.min_val: 3.0
+  events.generation.exogenous.attributes.polarity.min:      -0.3
+  events.generation.exogenous.attributes.polarity.max:      0.3
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.90
+  events.generation.exogenous.attributes.lifecycle.fast_range: [1, 5]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [8, 20]
+
+  # 内生阈值：密度触发（人群热点自发形成）
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  density
+  events.generation.endogenous_threshold.critical_threshold: 0.50
+  events.generation.endogenous_threshold.grid_resolution:    25
+  events.generation.endogenous_threshold.min_agents_in_cell: 5
+  events.generation.endogenous_threshold.cooldown:           15
+
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.45
+  events.generation.endogenous_cascade.background_lambda: 0.0
+
+_analyse_overrides:
+  parser.narrative_mode: dramatic
+  parser.theme: urban_crowd
+  visual.impact_heatmap: true       # 空间热图重要
+  visual.spatial_opinions: true
+  report.title: 城市人群聚集热点动力学分析

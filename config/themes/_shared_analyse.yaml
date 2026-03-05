@@ -1,0 +1,53 @@
+# config/themes/_shared_analyse.yaml
+#
+# 所有 theme 共享的分析配置。
+# theme 文件通过 _analyse_overrides 覆盖其中的特定字段
+#（如 parser.narrative_mode、parser.theme）。
+
+output:
+  dir: output
+  formats: [md, html]
+  lang: zh
+  save_figures: true
+  save_timeseries: true
+  save_features_json: true
+
+feature:
+  enabled: true
+  layer_idx: 0
+  include_trends: true
+
+parser:
+  enabled: false          # 需要 api_key 时在运行时打开
+  api_key: ""
+  model: gpt-4o
+  base_url:
+  lang: zh
+  fmt: md
+  sections: [opinion, spatial, topo, event]
+  include_executive_summary: true
+  max_tokens: 2048
+  narrative_mode: diagnostic   # 默认；各 theme 可覆盖
+  theme:                       # null = 自动检测；各 theme 填写具体值
+
+report:
+  enabled: true
+  formats: [md, html]
+  include_toc: true
+  include_meta: true
+  include_snapshot: true
+  title:
+
+visual:
+  enabled: true
+  dashboard: true
+  opinion_distribution: true
+  spatial_opinions: true
+  opinion_timeseries: true
+  impact_heatmap: false
+  event_timeline: true
+  polarization_evolution: true
+  network_homophily: false
+  dpi: 150
+
+simulation_meta: {}

@@ -1,0 +1,81 @@
+# config/themes/protest.yaml
+#
+# 场景：街头抗议 / 社会运动
+#
+# 特征：
+#   - 参与者有共同诉求但内部存在温和派 vs 激进派分歧
+#   - 密度触发事件（人群聚集 → 对峙 → 冲突）
+#   - 警方/对立方的外部干预可作为干预实验对象
+#   - 空间动态重要：冲突在密集区爆发，扩散到外围
+#   - 研究关注：激进化过程、空间扩散、干预效果
+
+_meta:
+  label: 街头抗议 / 社会运动
+  description: >
+    街头抗议场景。人群在空间上动态聚集，密度驱动对峙事件，
+    内部温和派与激进派分化，研究激进化路径与干预时机。
+  scenario: protest
+  tags: [protest, radicalization, spatial_dynamics, intervention]
+
+_presets:
+  networks.builder:       barabasi_albert   # 有影响力节点（意见领袖）
+  spatial.distributions:  clustered
+  engine.interface:       polarized
+
+_overrides:
+  engine.interface.agents.num_agents:        350
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params.split: 0.4  # 更多激进派
+
+  engine.interface.simulation.total_steps:   600
+  engine.interface.simulation.seed:          303
+
+  engine.maths.dynamics.epsilon_base:   0.22
+  engine.maths.dynamics.mu_base:        0.35
+  engine.maths.dynamics.alpha_mod:      0.40
+  engine.maths.dynamics.beta_mod:       0.20
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             5.0
+  engine.maths.field.beta:              0.07
+  engine.maths.field.temporal_window:   150.0
+
+  engine.maths.topo.threshold:          0.25
+  engine.maths.topo.radius_base:        0.06
+  engine.maths.topo.radius_dynamic:     0.14
+
+  networks.builder.params.n:  350
+  networks.builder.params.m:  4    # BA 网络参数
+
+  spatial.distribution.n_clusters:  5
+  spatial.distribution.cluster_std: 0.09
+
+  # 外生：警方公告/对立群体声明（低频、高极性）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     303
+  events.generation.exogenous.time_trigger.lambda_rate: 0.12
+  events.generation.exogenous.attributes.intensity.min_val:   10.0
+  events.generation.exogenous.attributes.polarity.min:        -0.8
+  events.generation.exogenous.attributes.polarity.max:        0.8
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.6
+  events.generation.exogenous.attributes.lifecycle.fast_range: [3, 8]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [15, 40]
+
+  # 内生阈值：密度触发（人群聚集 → 冲突）
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  density
+  events.generation.endogenous_threshold.critical_threshold: 0.50
+  events.generation.endogenous_threshold.grid_resolution:    20
+  events.generation.endogenous_threshold.min_agents_in_cell: 4
+  events.generation.endogenous_threshold.cooldown:           25
+  events.generation.endogenous_threshold.attributes.intensity.base_value:  12.0
+  events.generation.endogenous_threshold.attributes.intensity.scale_factor: 18.0
+
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.65
+  events.generation.endogenous_cascade.background_lambda: 0.0
+
+_analyse_overrides:
+  parser.narrative_mode: chronicle
+  parser.theme: protest
+  report.title: 街头抗议运动空间动力学分析

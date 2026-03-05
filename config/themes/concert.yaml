@@ -1,7 +1,91 @@
-agents:
-network:
-events:
-dynamics:
-simulation:
-field:
-topology:
+# config/themes/concert.yaml
+#
+# 场景：露天演唱会 / 音乐节
+#
+# 特征：
+#   - 大规模密集人群，空间高度聚集
+#   - 情绪高涨、意见趋同速度快（epsilon 宽，mu 大）
+#   - 外部事件（节目开始/结束/突发）频繁且烈度高
+#   - 级联传播活跃（人群情绪相互感染）
+#   - 极端化风险低，但瞬时冲击大
+#   - 生命周期以短促事件为主
+
+_meta:
+  label: 演唱会 / 音乐节
+  description: >
+    大型露天演唱会或音乐节场景。人群高度聚集、情绪同步性强，
+    外部事件（节目、烟火、突发）驱动短时强冲击，意见快速收敛。
+  scenario: concert_crowd
+  tags: [crowd, entertainment, high_density, short_burst]
+
+_presets:
+  networks.builder:       small_world
+  spatial.distributions:  clustered
+  engine.interface:       polarized     # 初始有一定分散，会快速收敛
+
+_overrides:
+  # 智能体规模
+  engine.interface.agents.num_agents:        500
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params.split: 0.5
+
+  # 模拟时长
+  engine.interface.simulation.total_steps:   300
+  engine.interface.simulation.seed:          101
+
+  # 动力学：宽容度高、更新快（人群情绪易感染）
+  engine.maths.dynamics.epsilon_base:   0.40
+  engine.maths.dynamics.mu_base:        0.45
+  engine.maths.dynamics.alpha_mod:      0.30
+  engine.maths.dynamics.beta_mod:       0.10
+  engine.maths.dynamics.backfire:       false
+
+  # 冲击场：衰减快（局部事件）
+  engine.maths.field.alpha:             8.0
+  engine.maths.field.beta:              0.10
+  engine.maths.field.temporal_window:   60.0
+
+  # 拓扑：紧密局部连接
+  engine.maths.topo.threshold:          0.35
+  engine.maths.topo.radius_base:        0.04
+  engine.maths.topo.radius_dynamic:     0.10
+
+  # 网络：小世界，连接紧密
+  networks.builder.params.n:    500
+  networks.builder.params.k:    10
+  networks.builder.params.p:    0.15
+
+  # 空间：高聚集（演出区 + 观众区）
+  spatial.distribution.n_clusters:  3
+  spatial.distribution.cluster_std: 0.07
+
+  # 外生事件：频繁、高强度短脉冲（节目切换、烟火等）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     201
+  events.generation.exogenous.time_trigger.type:        poisson
+  events.generation.exogenous.time_trigger.lambda_rate: 0.50
+  events.generation.exogenous.attributes.intensity.type:      pareto
+  events.generation.exogenous.attributes.intensity.shape:     2.0
+  events.generation.exogenous.attributes.intensity.min_val:   6.0
+  events.generation.exogenous.attributes.lifecycle.type:      bimodal
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.95
+  events.generation.exogenous.attributes.lifecycle.fast_range: [1, 4]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [8, 15]
+
+  # 内生阈值：密度触发（人群涌动）
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  density
+  events.generation.endogenous_threshold.critical_threshold: 0.55
+  events.generation.endogenous_threshold.grid_resolution:    20
+  events.generation.endogenous_threshold.min_agents_in_cell: 6
+  events.generation.endogenous_threshold.cooldown:           15
+
+  # 级联：活跃（情绪感染链）
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.7
+  events.generation.endogenous_cascade.background_lambda: 0.0
+
+_analyse_overrides:
+  parser.narrative_mode: dramatic
+  parser.theme: concert_crowd
+  report.title: 演唱会人群情绪动力学分析

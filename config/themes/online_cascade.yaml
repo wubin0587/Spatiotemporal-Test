@@ -1,0 +1,76 @@
+# config/themes/online_cascade.yaml
+#
+# 场景：信息级联 / 病毒式传播（社交媒体）
+#
+# 特征：
+#   - 尺度自由网络：少数超级节点（大V/KOL）主导传播
+#   - 级联生成器是核心：Hawkes 过程描述转发链
+#   - 空间无关（纯线上），意见维度多（话题向量）
+#   - 传播速度极快，生命周期短（72小时热点）
+#   - 研究关注：超级节点移除效果、级联临界条件、话题竞争
+
+_meta:
+  label: 社交媒体信息级联 / 病毒传播
+  description: >
+    社交媒体平台信息病毒传播场景。尺度自由网络中超级节点
+    触发 Hawkes 级联，研究传播临界条件与关键节点干预效果。
+  scenario: online_cascade
+  tags: [social_media, viral, cascade, scale_free, hawkes]
+
+_presets:
+  networks.builder:       barabasi_albert
+  spatial.distributions:  uniform          # 线上，空间无意义
+  engine.interface:       uniform
+
+_overrides:
+  engine.interface.agents.num_agents:        500
+  engine.interface.agents.opinion_layers:    4   # 多话题维度
+  engine.interface.agents.initial_opinions.params: {}
+
+  engine.interface.simulation.total_steps:   300
+  engine.interface.simulation.seed:          909
+
+  engine.maths.dynamics.epsilon_base:   0.35
+  engine.maths.dynamics.mu_base:        0.50   # 快速更新（转发即更新）
+  engine.maths.dynamics.alpha_mod:      0.55
+  engine.maths.dynamics.beta_mod:       0.30
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             10.0   # 快速衰减（热点短命）
+  engine.maths.field.beta:              0.15
+  engine.maths.field.temporal_window:   50.0
+
+  engine.maths.topo.threshold:          0.40
+  engine.maths.topo.radius_base:        0.10
+  engine.maths.topo.radius_dynamic:     0.25
+
+  networks.builder.params.n:  500
+  networks.builder.params.m:  5    # 较高的 BA 参数 → 更强枢纽
+
+  # 外生事件：KOL 发文（少量、高强度）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     909
+  events.generation.exogenous.time_trigger.lambda_rate: 0.08
+  events.generation.exogenous.attributes.intensity.type:    pareto
+  events.generation.exogenous.attributes.intensity.shape:   1.5   # 极重尾
+  events.generation.exogenous.attributes.intensity.min_val: 8.0
+  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.95
+  events.generation.exogenous.attributes.lifecycle.fast_range: [1, 3]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [5, 12]
+
+  # 内生阈值：关闭（纯级联驱动）
+  events.generation.endogenous_threshold.enabled: false
+
+  # 级联：核心机制，接近临界（mu_multiplier 接近 1）
+  events.generation.endogenous_cascade.enabled:           true
+  events.generation.endogenous_cascade.mu_multiplier:     0.85   # 接近超临界
+  events.generation.endogenous_cascade.background_lambda: 0.05   # 持续背景发帖
+  events.generation.endogenous_cascade.attributes.intensity.cascade_decay: 0.4
+  events.generation.endogenous_cascade.attributes.diffusion.inherit_from_parent: true
+  events.generation.endogenous_cascade.attributes.diffusion.spatial_mutation:    0.02
+
+_analyse_overrides:
+  parser.narrative_mode: predictive
+  parser.theme: online_cascade
+  visual.event_timeline: true
+  report.title: 社交媒体信息级联病毒传播分析

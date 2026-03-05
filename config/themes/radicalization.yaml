@@ -1,0 +1,80 @@
+# config/themes/radicalization.yaml
+#
+# 场景：在线极端化 / 激进化研究
+#
+# 特征：
+#   - 初始意见近似正态分布，逐渐向两端收敛
+#   - 意见极端化本身触发更多激化事件（正反馈）
+#   - 网络结构：尺度自由（少数极端节点影响力巨大）
+#   - 级联效应强（极端内容病毒传播）
+#   - 研究关注：极端化速度、临界点、去极端化干预窗口
+
+_meta:
+  label: 在线极端化 / 激进化
+  description: >
+    在线社区极端化场景。尺度自由网络中少数极端节点主导信息流，
+    极端化自我强化，研究激进化临界点与干预时机窗口。
+  scenario: radicalization
+  tags: [radicalization, scale_free, online, feedback_loop]
+
+_presets:
+  networks.builder:       barabasi_albert
+  spatial.distributions:  uniform          # 线上场景，空间不重要
+  engine.interface:       normal           # 初始正态，逐渐极化
+
+_overrides:
+  engine.interface.agents.num_agents:        300
+  engine.interface.agents.opinion_layers:    3
+  engine.interface.agents.initial_opinions.params.mean: 0.5
+  engine.interface.agents.initial_opinions.params.std:  0.18
+
+  engine.interface.simulation.total_steps:   800
+  engine.interface.simulation.seed:          404
+
+  # 动力学：容忍度低，极端化倾向
+  engine.maths.dynamics.epsilon_base:   0.15
+  engine.maths.dynamics.mu_base:        0.25
+  engine.maths.dynamics.alpha_mod:      0.45   # 强事件放大
+  engine.maths.dynamics.beta_mod:       0.25
+  engine.maths.dynamics.backfire:       true
+
+  engine.maths.field.alpha:             4.0
+  engine.maths.field.beta:              0.06
+  engine.maths.field.temporal_window:   200.0
+
+  engine.maths.topo.threshold:          0.15
+  engine.maths.topo.radius_base:        0.08
+  engine.maths.topo.radius_dynamic:     0.20
+
+  networks.builder.params.n:  300
+  networks.builder.params.m:  3
+
+  # 内生阈值：极端化触发（核心研究机制）
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
+  events.generation.endogenous_threshold.critical_threshold: 0.60
+  events.generation.endogenous_threshold.grid_resolution:    20
+  events.generation.endogenous_threshold.min_agents_in_cell: 3
+  events.generation.endogenous_threshold.cooldown:           40
+  events.generation.endogenous_threshold.attributes.intensity.base_value:   15.0
+  events.generation.endogenous_threshold.attributes.intensity.scale_factor: 20.0
+  events.generation.endogenous_threshold.attributes.polarity.type: dynamic
+
+  # 外生：低频背景噪声（算法推送等）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     404
+  events.generation.exogenous.time_trigger.lambda_rate: 0.10
+  events.generation.exogenous.attributes.intensity.min_val: 3.0
+  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.85
+  events.generation.exogenous.attributes.lifecycle.fast_range: [2, 6]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [10, 25]
+
+  # 级联：强（极端内容病毒传播）
+  events.generation.endogenous_cascade.enabled:           true
+  events.generation.endogenous_cascade.mu_multiplier:     0.75
+  events.generation.endogenous_cascade.background_lambda: 0.0
+
+_analyse_overrides:
+  parser.narrative_mode: diagnostic
+  parser.theme: radicalization
+  report.title: 在线极端化动力学诊断报告

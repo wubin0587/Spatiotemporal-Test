@@ -1,0 +1,86 @@
+# config/themes/disaster_emergency.yaml
+#
+# 场景：自然灾害 / 突发公共事件应急响应
+#
+# 特征：
+#   - 强外部冲击（灾害事件）突然发生，强度极高
+#   - 冲击后意见迅速收敛（团结效应），随后分化（责任归因）
+#   - 空间结构：受灾区（高密度）+ 外围区（低密度）
+#   - 官方信息与民间传言竞争
+#   - 研究关注：冲击→收敛→再分化的完整周期，空间异质性
+
+_meta:
+  label: 自然灾害 / 突发公共事件
+  description: >
+    突发灾害应急场景。强冲击后经历"团结收敛—责任分化"完整周期，
+    空间上受灾区与外围区反应差异显著，研究危机信息传播的时空结构。
+  scenario: disaster_emergency
+  tags: [disaster, emergency, spatial_heterogeneity, recovery]
+
+_presets:
+  networks.builder:       small_world
+  spatial.distributions:  radial_decay      # 核心受灾区 + 外围
+  engine.interface:       uniform
+
+_overrides:
+  engine.interface.agents.num_agents:        400
+  engine.interface.agents.opinion_layers:    2
+  engine.interface.agents.initial_opinions.params: {}
+
+  engine.interface.simulation.total_steps:   500
+  engine.interface.simulation.seed:          1111
+
+  # 初期团结：宽容度高
+  engine.maths.dynamics.epsilon_base:   0.38
+  engine.maths.dynamics.mu_base:        0.42
+  engine.maths.dynamics.alpha_mod:      0.50
+  engine.maths.dynamics.beta_mod:       0.20
+  engine.maths.dynamics.backfire:       false
+
+  engine.maths.field.alpha:             4.0   # 冲击扩散范围广
+  engine.maths.field.beta:              0.05
+  engine.maths.field.temporal_window:   120.0
+
+  engine.maths.topo.threshold:          0.35
+  engine.maths.topo.radius_base:        0.07
+  engine.maths.topo.radius_dynamic:     0.18
+
+  networks.builder.params.n:  400
+  networks.builder.params.k:  10
+  networks.builder.params.p:  0.12
+
+  spatial.distribution.center:     [0.5, 0.5]
+  spatial.distribution.max_radius: 0.5
+  spatial.distribution.strength:   2.5    # 向核心聚集
+
+  # 外生事件：灾害主事件（超高强度，单次）+ 余震（低频后续）
+  events.generation.exogenous.enabled:  true
+  events.generation.exogenous.seed:     1111
+  events.generation.exogenous.time_trigger.lambda_rate: 0.06
+  events.generation.exogenous.attributes.intensity.type:    pareto
+  events.generation.exogenous.attributes.intensity.shape:   1.5
+  events.generation.exogenous.attributes.intensity.min_val: 4.0
+  events.generation.exogenous.attributes.polarity.min:      -0.4
+  events.generation.exogenous.attributes.polarity.max:      0.4
+  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.5
+  events.generation.exogenous.attributes.lifecycle.fast_range: [3, 10]
+  events.generation.exogenous.attributes.lifecycle.slow_range: [20, 60]
+
+  # 内生阈值：受灾区高密度触发
+  events.generation.endogenous_threshold.enabled:            true
+  events.generation.endogenous_threshold.monitor_attribute:  density
+  events.generation.endogenous_threshold.critical_threshold: 0.45
+  events.generation.endogenous_threshold.grid_resolution:    18
+  events.generation.endogenous_threshold.min_agents_in_cell: 4
+  events.generation.endogenous_threshold.cooldown:           20
+
+  events.generation.endogenous_cascade.enabled:          true
+  events.generation.endogenous_cascade.mu_multiplier:    0.60
+  events.generation.endogenous_cascade.background_lambda: 0.01
+
+_analyse_overrides:
+  parser.narrative_mode: chronicle
+  parser.theme: disaster_emergency
+  visual.impact_heatmap: true
+  visual.spatial_opinions: true
+  report.title: 突发灾害应急舆情时空动力学分析

@@ -6,7 +6,6 @@
 """
 
 import numpy as np
-import random
 from scipy.spatial import cKDTree
 
 def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndarray, 
@@ -62,7 +61,7 @@ def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndar
         if neighbors:
             # Randomly select one social connection to interact with
             # (Simulates the algorithm pushing a post from a friend)
-            j = random.choice(neighbors)
+            j = np.random.choice(neighbors)
             pairs.append((i, j))
 
     # --- Case B: Active Agents (Spatial Interactions) ---
@@ -85,7 +84,7 @@ def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndar
             
             if valid_neighbors:
                 # Pick one random spatial neighbor
-                j = random.choice(valid_neighbors)
+                j = np.random.choice(valid_neighbors)
                 pairs.append((i, j))
                 
     return pairs

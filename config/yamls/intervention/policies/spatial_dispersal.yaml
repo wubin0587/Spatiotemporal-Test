@@ -1,7 +1,0 @@
-type: spatial_dispersal
-focal_point:
-strength:
-min_radius:
-agents:
-top_k_by_impact:
-name:

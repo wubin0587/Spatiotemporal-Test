@@ -1,7 +1,0 @@
-type: composite
-logic:
-triggers:
-  - type:
-cooldown:
-max_fires:
-name:

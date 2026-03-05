@@ -1,19 +1,20 @@
 # config/themes/corporate_crisis.yaml
 #
-# 场景：企业公关危机 / 品牌舆情
+# Scenario: corporate PR crisis / brand sentiment
 #
-# 特征：
-#   - 初始意见正态偏正（品牌好感度），危机冲击后向负侧偏移
-#   - 一次性高强度负向事件（丑闻曝光）+ 后续辟谣/公关反应
-#   - 网络：大V/媒体节点（BA）主导舆论走向
-#   - 话题生命周期：短期爆发 → 长尾发酵
-#   - 研究关注：危机公关响应时机、KOL 干预效果、舆情修复速度
+# Key characteristics:
+#   - Initial opinions normally distributed with positive bias (brand goodwill)
+#   - One-off high-intensity negative event (scandal exposure) shifts sentiment negatively
+#   - Media/KOL nodes (BA network) dominate the opinion trajectory
+#   - Topic lifecycle: short burst -> long-tail fermentation
+#   - Research focus: PR response timing, KOL intervention effect, sentiment recovery speed
 
 _meta:
-  label: 企业公关危机 / 品牌舆情
+  label: Corporate PR Crisis / Brand Sentiment
   description: >
-    企业品牌危机场景。负向丑闻事件冲击后舆论快速恶化，
-    公关响应与KOL干预竞争，研究响应时机对舆情修复速度的影响。
+    Brand crisis scenario. A negative scandal event rapidly degrades sentiment.
+    PR responses and KOL interventions compete on a BA influence network.
+    Designed to study response timing and sentiment recovery trajectories.
   scenario: corporate_crisis
   tags: [PR, brand, crisis, media, KOL]
 
@@ -25,7 +26,7 @@ _presets:
 _overrides:
   engine.interface.agents.num_agents:        350
   engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params.mean: 0.65   # 初始偏正面
+  engine.interface.agents.initial_opinions.params.mean: 0.65   # start with positive bias
   engine.interface.agents.initial_opinions.params.std:  0.15
 
   engine.interface.simulation.total_steps:   400
@@ -48,7 +49,7 @@ _overrides:
   networks.builder.params.n:  350
   networks.builder.params.m:  4
 
-  # 外生事件：媒体报道（混合正负）
+  # exogenous: media coverage (mixed polarity, negatively skewed after crisis)
   events.generation.exogenous.enabled:  true
   events.generation.exogenous.seed:     1212
   events.generation.exogenous.time_trigger.lambda_rate: 0.20
@@ -56,12 +57,12 @@ _overrides:
   events.generation.exogenous.attributes.intensity.shape:   2.0
   events.generation.exogenous.attributes.intensity.min_val: 4.0
   events.generation.exogenous.attributes.polarity.min:      -0.9
-  events.generation.exogenous.attributes.polarity.max:      0.6   # 负向偏多
+  events.generation.exogenous.attributes.polarity.max:      0.6   # negative skew after scandal
   events.generation.exogenous.attributes.lifecycle.fast_prob:  0.75
   events.generation.exogenous.attributes.lifecycle.fast_range: [2, 8]
   events.generation.exogenous.attributes.lifecycle.slow_range: [15, 40]
 
-  # 内生阈值：负面意见聚集区触发二次发酵
+  # endogenous threshold: negative opinion clusters trigger secondary fermentation
   events.generation.endogenous_threshold.enabled:            true
   events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
   events.generation.endogenous_threshold.critical_threshold: 0.55
@@ -76,4 +77,4 @@ _overrides:
 _analyse_overrides:
   parser.narrative_mode: diagnostic
   parser.theme: corporate_crisis
-  report.title: 企业品牌危机舆情动力学分析
+  report.title: Corporate PR Crisis — Brand Sentiment Analysis

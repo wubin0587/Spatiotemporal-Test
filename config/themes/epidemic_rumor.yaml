@@ -1,26 +1,27 @@
 # config/themes/epidemic_rumor.yaml
 #
-# 场景：疫情 / 公共卫生危机中的谣言传播
+# Scenario: rumor spread during a public health crisis
 #
-# 特征：
-#   - 信息真空期触发大量谣言级联（内生级联为核心）
-#   - 恐慌情绪导致意见快速极化（信 vs 不信）
-#   - 官方辟谣是外部事件，与谣言竞争影响力
-#   - 时间上有明显的"谣言爆发—辟谣—平息"波浪结构
-#   - 研究关注：谣言生命周期、官方信息干预时机
+# Key characteristics:
+#   - Information vacuum triggers large rumor cascades (cascade generator is central)
+#   - Panic drives rapid opinion polarization (believe vs. disbelieve)
+#   - Official corrections are exogenous events competing with rumors
+#   - Time structure shows "rumor burst -> correction -> partial recovery" waves
+#   - Research focus: rumor lifecycle, optimal correction timing, health literacy moderation
 
 _meta:
-  label: 疫情 / 公共卫生危机舆情
+  label: Public Health Crisis — Rumor Spread
   description: >
-    公共卫生危机中的谣言传播场景。信息不对称触发级联谣言，
-    与官方辟谣事件竞争，研究干预时机与信息素养的调节作用。
+    Public health crisis information scenario. Information asymmetry triggers
+    Hawkes-process rumor cascades that compete with official corrections.
+    Designed to study intervention timing and information literacy effects.
   scenario: epidemic_rumor
   tags: [rumor, public_health, cascade, information_competition]
 
 _presets:
   networks.builder:       small_world
   spatial.distributions:  gaussian
-  engine.interface:       uniform       # 初始均匀，危机冲击后极化
+  engine.interface:       uniform       # start uniform; crisis shock induces polarization
 
 _overrides:
   engine.interface.agents.num_agents:        500
@@ -30,9 +31,10 @@ _overrides:
   engine.interface.simulation.total_steps:   500
   engine.interface.simulation.seed:          606
 
+  # dynamics: moderate tolerance, high event amplification (panic spreading)
   engine.maths.dynamics.epsilon_base:   0.30
   engine.maths.dynamics.mu_base:        0.40
-  engine.maths.dynamics.alpha_mod:      0.50   # 恐慌放大
+  engine.maths.dynamics.alpha_mod:      0.50
   engine.maths.dynamics.beta_mod:       0.25
   engine.maths.dynamics.backfire:       false
 
@@ -48,19 +50,19 @@ _overrides:
   networks.builder.params.k:  12
   networks.builder.params.p:  0.12
 
-  # 外生：官方通告（低频、正极性辟谣）
+  # exogenous: official announcements (low freq, positively biased polarity = corrections)
   events.generation.exogenous.enabled:  true
   events.generation.exogenous.seed:     606
   events.generation.exogenous.time_trigger.lambda_rate: 0.08
   events.generation.exogenous.attributes.intensity.min_val:   5.0
   events.generation.exogenous.attributes.polarity.type:       uniform
   events.generation.exogenous.attributes.polarity.min:        -0.2
-  events.generation.exogenous.attributes.polarity.max:        0.5   # 偏正向（辟谣）
+  events.generation.exogenous.attributes.polarity.max:        0.5   # skewed positive (corrections)
   events.generation.exogenous.attributes.lifecycle.fast_prob: 0.5
   events.generation.exogenous.attributes.lifecycle.fast_range: [5, 15]
   events.generation.exogenous.attributes.lifecycle.slow_range: [20, 60]
 
-  # 内生阈值：意见方差触发（信息混乱区）
+  # endogenous threshold: variance trigger (information confusion zones)
   events.generation.endogenous_threshold.enabled:            true
   events.generation.endogenous_threshold.monitor_attribute:  opinion_variance
   events.generation.endogenous_threshold.critical_threshold: 0.40
@@ -68,14 +70,14 @@ _overrides:
   events.generation.endogenous_threshold.min_agents_in_cell: 4
   events.generation.endogenous_threshold.cooldown:           20
 
-  # 级联：强（谣言病毒扩散，核心机制）
+  # cascade: strong near-critical (viral rumor diffusion, core mechanism)
   events.generation.endogenous_cascade.enabled:           true
-  events.generation.endogenous_cascade.mu_multiplier:     0.80   # 接近临界
-  events.generation.endogenous_cascade.background_lambda: 0.02   # 持续背景谣言
+  events.generation.endogenous_cascade.mu_multiplier:     0.80
+  events.generation.endogenous_cascade.background_lambda: 0.02   # persistent background rumor rate
   events.generation.endogenous_cascade.attributes.intensity.cascade_decay: 0.6
 
 _analyse_overrides:
   parser.narrative_mode: chronicle
   parser.theme: epidemic_rumor
   visual.event_timeline: true
-  report.title: 公共卫生危机舆情级联传播分析
+  report.title: Public Health Crisis — Rumor Cascade Analysis

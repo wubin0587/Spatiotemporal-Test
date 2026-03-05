@@ -1,8 +1,8 @@
 # config/themes/_shared_analyse.yaml
 #
-# 所有 theme 共享的分析配置。
-# theme 文件通过 _analyse_overrides 覆盖其中的特定字段
-#（如 parser.narrative_mode、parser.theme）。
+# Shared analysis configuration used by all themes.
+# Individual themes override specific fields via _analyse_overrides
+# (e.g. parser.narrative_mode, parser.theme, figure toggles).
 
 output:
   dir: output
@@ -18,7 +18,7 @@ feature:
   include_trends: true
 
 parser:
-  enabled: false          # 需要 api_key 时在运行时打开
+  enabled: false          # enable at runtime when api_key is available
   api_key: ""
   model: gpt-4o
   base_url:
@@ -27,8 +27,8 @@ parser:
   sections: [opinion, spatial, topo, event]
   include_executive_summary: true
   max_tokens: 2048
-  narrative_mode: diagnostic   # 默认；各 theme 可覆盖
-  theme:                       # null = 自动检测；各 theme 填写具体值
+  narrative_mode: diagnostic   # default; overridden per theme
+  theme:                       # null = auto-detect; themes supply a concrete value
 
 report:
   enabled: true

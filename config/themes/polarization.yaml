@@ -1,19 +1,20 @@
 # config/themes/polarization.yaml
 #
-# 场景：社会两极分化（慢性、结构性）
+# Scenario: chronic societal polarization (slow, structural)
 #
-# 特征：
-#   - 意见空间逐渐从单峰分布演化为双峰
-#   - 内生方差触发（混合区域冲突）
-#   - 网络同质化（相似者聚集）随时间加剧
-#   - 无明显单一触发事件，是长期累积过程
-#   - 研究关注：分化速度、稳定双峰结构、破坏回音壁的干预
+# Key characteristics:
+#   - Opinion distribution evolves from unimodal to stable bimodal over time
+#   - Intra-cell variance triggers events in ideologically mixed zones
+#   - Network homophily intensifies as agents selectively connect
+#   - No single dramatic trigger; driven by cumulative drift
+#   - Research focus: bifurcation conditions, stable bimodal state, bridge-breaking interventions
 
 _meta:
-  label: 社会两极分化（慢性）
+  label: Chronic Societal Polarization
   description: >
-    长期结构性两极分化场景。初始意见中等分散，随时间演化为
-    稳定双峰结构，重点研究分化临界条件与网络重连干预效果。
+    Long-run structural polarization. Initial opinions are moderately dispersed
+    and evolve into a stable bimodal distribution. Designed to study bifurcation
+    conditions and the effectiveness of network rewiring interventions.
   scenario: polarization
   tags: [polarization, bimodal, long_run, network_homophily]
 
@@ -52,7 +53,7 @@ _overrides:
   spatial.distribution.mean:    [0.5, 0.5]
   spatial.distribution.std_dev: [0.20, 0.20]
 
-  # 内生阈值：意见方差触发（混合区冲突，核心机制）
+  # endogenous threshold: variance trigger in mixed-opinion zones (core mechanism)
   events.generation.endogenous_threshold.enabled:            true
   events.generation.endogenous_threshold.monitor_attribute:  opinion_variance
   events.generation.endogenous_threshold.critical_threshold: 0.45
@@ -63,7 +64,7 @@ _overrides:
   events.generation.endogenous_threshold.attributes.intensity.scale_factor: 12.0
   events.generation.endogenous_threshold.attributes.content.amplify_dominant: false
 
-  # 外生：低强度背景媒体事件
+  # exogenous: low-intensity background media events
   events.generation.exogenous.enabled:  true
   events.generation.exogenous.seed:     505
   events.generation.exogenous.time_trigger.lambda_rate: 0.15
@@ -79,5 +80,5 @@ _overrides:
 _analyse_overrides:
   parser.narrative_mode: predictive
   parser.theme: polarization
-  visual.network_homophily: true     # 极化研究必看同质化指标
-  report.title: 社会两极分化演化动力学分析
+  visual.network_homophily: true     # homophily index is key for this scenario
+  report.title: Chronic Societal Polarization Dynamics Analysis

@@ -1,19 +1,20 @@
 # config/themes/election.yaml
 #
-# 场景：选举期间舆论演化
+# Scenario: opinion dynamics during an election campaign
 #
-# 特征：
-#   - 时间结构明确：竞选期 → 辩论/丑闻冲击 → 投票日 → 结果
-#   - 意见在连续轴上摇摆（支持率波动），非简单极化
-#   - 外部事件有明确时间节点（辩论、丑闻、民调发布）
-#   - 摇摆选民群体：中间意见者受事件冲击最大
-#   - 研究关注：关键事件的舆论冲击量、undecided 群体动态
+# Key characteristics:
+#   - Clear temporal structure: campaign -> debate/scandal shocks -> election day
+#   - Opinions oscillate on a continuous axis (support rate), not simple polarization
+#   - External events have discrete time anchors (debates, scandals, poll releases)
+#   - Undecided (center) voters are most sensitive to event shocks
+#   - Research focus: impact magnitude of key events, undecided voter trajectories
 
 _meta:
-  label: 选举期间舆论演化
+  label: Election Campaign Opinion Dynamics
   description: >
-    选举竞选期场景。时间轴上有离散的关键事件节点（辩论、丑闻），
-    重点研究摇摆群体的意见轨迹与关键事件的冲击量化。
+    Election campaign scenario with discrete shock events (debates, scandals).
+    Focus on swing-voter trajectories and the quantified impact of each event.
+    Heavy-tailed intensity distribution captures rare but decisive moments.
   scenario: election
   tags: [election, opinion_dynamics, swing_voters, event_driven]
 
@@ -49,21 +50,21 @@ _overrides:
   networks.builder.params.k:  10
   networks.builder.params.p:  0.10
 
-  # 外生事件：辩论/丑闻（爆发式，强度大，时间集中）
+  # exogenous: debates / scandals (heavy-tailed intensity for occasional super-events)
   events.generation.exogenous.enabled:  true
   events.generation.exogenous.seed:     707
   events.generation.exogenous.time_trigger.type:        poisson
   events.generation.exogenous.time_trigger.lambda_rate: 0.15
-  events.generation.exogenous.attributes.intensity.type:      pareto
-  events.generation.exogenous.attributes.intensity.shape:     1.8   # 重尾：偶有超级事件
-  events.generation.exogenous.attributes.intensity.min_val:   5.0
-  events.generation.exogenous.attributes.polarity.min:        -0.9
-  events.generation.exogenous.attributes.polarity.max:        0.9
-  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.6
+  events.generation.exogenous.attributes.intensity.type:    pareto
+  events.generation.exogenous.attributes.intensity.shape:   1.8   # heavy tail: rare super-events
+  events.generation.exogenous.attributes.intensity.min_val: 5.0
+  events.generation.exogenous.attributes.polarity.min:      -0.9
+  events.generation.exogenous.attributes.polarity.max:      0.9
+  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.6
   events.generation.exogenous.attributes.lifecycle.fast_range: [5, 20]
   events.generation.exogenous.attributes.lifecycle.slow_range: [30, 80]
 
-  # 内生阈值：意见极端化触发（支持者/反对者各自强化）
+  # endogenous threshold: extremism trigger (committed supporters self-reinforce)
   events.generation.endogenous_threshold.enabled:            true
   events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
   events.generation.endogenous_threshold.critical_threshold: 0.55
@@ -78,4 +79,4 @@ _overrides:
 _analyse_overrides:
   parser.narrative_mode: chronicle
   parser.theme: election
-  report.title: 选举期间舆论演化动力学分析
+  report.title: Election Campaign Opinion Dynamics Analysis

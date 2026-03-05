@@ -1,20 +1,20 @@
 # config/themes/deradicalization.yaml
 #
-# 场景：去极端化干预实验
+# Scenario: de-radicalization intervention experiment
 #
-# 特征：
-#   - 初始状态：已极化的群体（双峰分布）
-#   - 重点在 intervention：多种去极端化政策对照
-#   - 干预时机研究：早期 vs 中期 vs 晚期
-#   - auto_checkpoint 全开，支持反事实对比
-#   - 研究关注：哪种干预最有效、副作用（过度收敛）
+# Key characteristics:
+#   - Initial state: already-polarized population (bimodal opinions)
+#   - Focus is on interventions: multiple de-rad policies compared
+#   - Intervention timing study: early vs. mid vs. late
+#   - auto_checkpoint enabled for all rules to support counterfactual comparison
+#   - Research focus: which intervention is most effective, side-effects (over-convergence)
 
 _meta:
-  label: 去极端化干预实验
+  label: De-radicalization Intervention Experiment
   description: >
-    去极端化政策评估场景。系统初始已极化，通过多种干预
-    （网络重连、意见推拉、事件压制）进行对照实验，
-    auto_checkpoint 全开支持反事实分析。
+    Policy evaluation scenario. System starts polarized; three intervention
+    rules (network rewiring, opinion nudge, event suppression) run with
+    auto_checkpoint enabled for counterfactual analysis.
   scenario: deradicalization
   tags: [intervention, deradicalization, counterfactual, policy]
 
@@ -52,7 +52,7 @@ _overrides:
   spatial.distribution.n_clusters:  4
   spatial.distribution.cluster_std: 0.10
 
-  # 外生：低强度背景（被干预政策管控）
+  # exogenous: low-intensity background (subject to policy suppression)
   events.generation.exogenous.enabled:  true
   events.generation.exogenous.seed:     1010
   events.generation.exogenous.time_trigger.lambda_rate: 0.12
@@ -72,7 +72,7 @@ _overrides:
   events.generation.endogenous_cascade.mu_multiplier:    0.55
   events.generation.endogenous_cascade.background_lambda: 0.0
 
-  # 干预配置（三波次，全部开 auto_checkpoint）
+  # three-wave intervention schedule, all auto-checkpointed
   intervention.interventions:
     - label: early_rewire
       auto_checkpoint: true
@@ -115,4 +115,4 @@ _analyse_overrides:
   parser.theme: deradicalization
   visual.network_homophily: true
   visual.polarization_evolution: true
-  report.title: 去极端化干预效果对照分析
+  report.title: De-radicalization Intervention — Comparative Analysis

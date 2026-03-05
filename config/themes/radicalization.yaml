@@ -1,26 +1,27 @@
 # config/themes/radicalization.yaml
 #
-# 场景：在线极端化 / 激进化研究
+# Scenario: online radicalization
 #
-# 特征：
-#   - 初始意见近似正态分布，逐渐向两端收敛
-#   - 意见极端化本身触发更多激化事件（正反馈）
-#   - 网络结构：尺度自由（少数极端节点影响力巨大）
-#   - 级联效应强（极端内容病毒传播）
-#   - 研究关注：极端化速度、临界点、去极端化干预窗口
+# Key characteristics:
+#   - Initial opinions near-normal; gradually collapse toward the extremes
+#   - Opinion extremism itself triggers further radicalizing events (positive feedback)
+#   - Scale-free network: a few extreme hubs dominate influence
+#   - Strong cascade (extreme content spreads virally)
+#   - Research focus: radicalization speed, tipping point, de-rad intervention window
 
 _meta:
-  label: 在线极端化 / 激进化
+  label: Online Radicalization
   description: >
-    在线社区极端化场景。尺度自由网络中少数极端节点主导信息流，
-    极端化自我强化，研究激进化临界点与干预时机窗口。
+    Online community radicalization. Scale-free network with extreme hubs drives
+    a positive feedback loop between opinion extremism and event generation.
+    Designed to study tipping points and de-radicalization intervention windows.
   scenario: radicalization
   tags: [radicalization, scale_free, online, feedback_loop]
 
 _presets:
   networks.builder:       barabasi_albert
-  spatial.distributions:  uniform          # 线上场景，空间不重要
-  engine.interface:       normal           # 初始正态，逐渐极化
+  spatial.distributions:  uniform          # online context; space irrelevant
+  engine.interface:       normal           # start near-normal, drift to extremes
 
 _overrides:
   engine.interface.agents.num_agents:        300
@@ -31,10 +32,10 @@ _overrides:
   engine.interface.simulation.total_steps:   800
   engine.interface.simulation.seed:          404
 
-  # 动力学：容忍度低，极端化倾向
+  # dynamics: low tolerance, strong event amplification, backfire enabled
   engine.maths.dynamics.epsilon_base:   0.15
   engine.maths.dynamics.mu_base:        0.25
-  engine.maths.dynamics.alpha_mod:      0.45   # 强事件放大
+  engine.maths.dynamics.alpha_mod:      0.45
   engine.maths.dynamics.beta_mod:       0.25
   engine.maths.dynamics.backfire:       true
 
@@ -49,7 +50,7 @@ _overrides:
   networks.builder.params.n:  300
   networks.builder.params.m:  3
 
-  # 内生阈值：极端化触发（核心研究机制）
+  # endogenous threshold: extremism trigger (core mechanism)
   events.generation.endogenous_threshold.enabled:            true
   events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
   events.generation.endogenous_threshold.critical_threshold: 0.60
@@ -60,7 +61,7 @@ _overrides:
   events.generation.endogenous_threshold.attributes.intensity.scale_factor: 20.0
   events.generation.endogenous_threshold.attributes.polarity.type: dynamic
 
-  # 外生：低频背景噪声（算法推送等）
+  # exogenous: low-rate background noise (algorithmic feed, etc.)
   events.generation.exogenous.enabled:  true
   events.generation.exogenous.seed:     404
   events.generation.exogenous.time_trigger.lambda_rate: 0.10
@@ -69,7 +70,7 @@ _overrides:
   events.generation.exogenous.attributes.lifecycle.fast_range: [2, 6]
   events.generation.exogenous.attributes.lifecycle.slow_range: [10, 25]
 
-  # 级联：强（极端内容病毒传播）
+  # cascade: strong (viral extreme content)
   events.generation.endogenous_cascade.enabled:           true
   events.generation.endogenous_cascade.mu_multiplier:     0.75
   events.generation.endogenous_cascade.background_lambda: 0.0
@@ -77,4 +78,4 @@ _overrides:
 _analyse_overrides:
   parser.narrative_mode: diagnostic
   parser.theme: radicalization
-  report.title: 在线极端化动力学诊断报告
+  report.title: Online Radicalization Dynamics — Diagnostic Report

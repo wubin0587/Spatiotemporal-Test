@@ -1,0 +1,6 @@
+type: spatial_dispersal
+focal_point: [0.5, 0.5]
+strength: 0.2
+min_radius: 0.1
+agents: null
+name: push_from_center

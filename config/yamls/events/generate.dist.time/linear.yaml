@@ -1,0 +1,3 @@
+type: linear
+slope: 0.001
+intercept: 0.01

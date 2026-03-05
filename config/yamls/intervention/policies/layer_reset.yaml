@@ -1,0 +1,6 @@
+type: layer_reset
+layer: 0
+init_type: uniform
+agents: null
+seed: 2024
+name: reset_layer0

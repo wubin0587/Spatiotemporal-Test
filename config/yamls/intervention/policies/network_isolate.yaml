@@ -1,0 +1,4 @@
+type: network_isolate
+agents: [0, 1]
+top_k_by_degree: 0
+name: isolate_agents

@@ -1,0 +1,3 @@
+type: layer_weight
+layer_weights: [1.0, 1.2, 0.8]
+name: set_layer_weights

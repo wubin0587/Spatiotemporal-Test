@@ -1,0 +1,6 @@
+type: event_filter
+min_polarity: -0.8
+max_polarity: 0.8
+min_intensity: 1.0
+source: null
+name: filter_extreme_events

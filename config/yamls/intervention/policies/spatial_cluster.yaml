@@ -1,0 +1,6 @@
+type: spatial_cluster
+focal_point: [0.5, 0.5]
+strength: 0.3
+agents: null
+region: null
+name: pull_to_center

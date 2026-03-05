@@ -1,0 +1,8 @@
+type: network_add_edges
+pairs: [[0, 10], [5, 15]]
+random_k: 0
+group_a: null
+group_b: null
+opinion_split: false
+seed: 2024
+name: add_specific_edges

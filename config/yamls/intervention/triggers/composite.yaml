@@ -1,0 +1,10 @@
+type: composite
+logic: and
+triggers:
+  - type: step
+    step: 200
+  - type: polarization
+    threshold: 0.35
+cooldown: 0
+max_fires: 1
+name: step_and_polarization

@@ -1,0 +1,7 @@
+type: opinion_nudge
+layer: -1
+delta: 0.05
+direction: positive
+agents: null
+top_k_by_impact: 0
+name: nudge_positive

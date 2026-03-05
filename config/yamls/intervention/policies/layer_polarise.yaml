@@ -1,0 +1,5 @@
+type: layer_polarise
+layer: -1
+strength: 0.3
+agents: null
+name: polarise_all_layers

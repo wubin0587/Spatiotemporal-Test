@@ -1,0 +1,6 @@
+type: layer_coupling
+source_layer: 0
+target_layer: 1
+coupling_strength: 0.1
+agents: null
+name: couple_l1_to_l0

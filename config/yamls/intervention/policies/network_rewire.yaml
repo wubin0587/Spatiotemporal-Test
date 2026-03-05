@@ -1,0 +1,4 @@
+type: network_rewire
+fraction: 0.1
+seed: 2024
+name: rewire_10pct

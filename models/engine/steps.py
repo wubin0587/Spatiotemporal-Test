@@ -69,9 +69,9 @@ class StepExecutor(SimulationEngine):
             'num_events': []
         }
         
-        # Random seed for reproducibility
+        # Random generator for reproducibility
         seed = self.sim_config.get('seed', 42)
-        np.random.seed(seed)
+        self._rng = np.random.default_rng(seed)
         
         logger.info(f"StepExecutor initialized with seed={seed}")
     
@@ -92,7 +92,7 @@ class StepExecutor(SimulationEngine):
         logger.info("=== Initializing Simulation ===")
 
         seed = self.sim_config.get('seed', 42)
-        np.random.seed(seed)
+        self._rng = np.random.default_rng(seed)
         
         # Step 1: Validate configuration
         self._validate_config()
@@ -104,7 +104,10 @@ class StepExecutor(SimulationEngine):
         logger.info(f"Setting up {self.num_agents} agents with {num_layers} opinion dimensions")
         
         # Step 3: Generate spatial positions
-        self.agent_positions = self.interface.generate_agent_positions(self.num_agents)
+        self.agent_positions = self.interface.generate_agent_positions(
+            self.num_agents,
+            rng=self._rng
+        )
         self.interface.validate_spatial_data(self.agent_positions, self.num_agents)
         
         # Step 4: Initialize opinions
@@ -112,7 +115,8 @@ class StepExecutor(SimulationEngine):
         self.opinion_matrix = self.interface.initialize_opinion_matrix(
             self.num_agents, 
             num_layers, 
-            opinion_init_config
+            opinion_init_config,
+            rng=self._rng
         )
         self.interface.validate_opinion_matrix(self.opinion_matrix, self.num_agents, num_layers)
         

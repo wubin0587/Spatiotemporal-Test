@@ -283,7 +283,11 @@ class EngineInterface:
     # 3. Spatial Subsystem Interface
     # =========================================================================
     
-    def generate_agent_positions(self, num_agents: int) -> np.ndarray:
+    def generate_agent_positions(
+        self,
+        num_agents: int,
+        rng: Optional[np.random.Generator] = None
+    ) -> np.ndarray:
         """
         Generates spatial positions for agents using the spatial module.
         
@@ -303,7 +307,7 @@ class EngineInterface:
         dist_config = spatial_config.get('distribution', {'type': 'uniform'})
         
         # Generate positions using spatial module
-        positions = create_spatial_distribution(num_agents, dist_config)
+        positions = create_spatial_distribution(num_agents, dist_config, rng=rng)
         
         # Validate output
         if positions.shape != (num_agents, 2):
@@ -374,8 +378,13 @@ class EngineInterface:
     # 4. Agent State Initialization
     # =========================================================================
     
-    def initialize_opinion_matrix(self, num_agents: int, num_layers: int, 
-                                   init_config: Dict[str, Any]) -> np.ndarray:
+    def initialize_opinion_matrix(
+        self,
+        num_agents: int,
+        num_layers: int,
+        init_config: Dict[str, Any],
+        rng: Optional[np.random.Generator] = None
+    ) -> np.ndarray:
         """
         Initializes the opinion matrix for all agents.
         
@@ -393,15 +402,18 @@ class EngineInterface:
         init_type = init_config.get('type', 'uniform').lower()
         params = init_config.get('params', {})
         
+        if rng is None:
+            rng = np.random.default_rng()
+
         if init_type == 'uniform':
             # Uniform random in [0, 1]
-            opinions = np.random.uniform(0, 1, size=(num_agents, num_layers))
+            opinions = rng.uniform(0, 1, size=(num_agents, num_layers))
             
         elif init_type == 'normal':
             # Normal distribution clipped to [0, 1]
             mean = params.get('mean', 0.5)
             std = params.get('std', 0.2)
-            opinions = np.random.normal(mean, std, size=(num_agents, num_layers))
+            opinions = rng.normal(mean, std, size=(num_agents, num_layers))
             opinions = np.clip(opinions, 0, 1)
             
         elif init_type == 'polarized':
@@ -409,11 +421,11 @@ class EngineInterface:
             split = params.get('split', 0.5)  # Proportion in first cluster
             num_left = int(num_agents * split)
             
-            left = np.random.normal(0.2, 0.1, size=(num_left, num_layers))
-            right = np.random.normal(0.8, 0.1, size=(num_agents - num_left, num_layers))
+            left = rng.normal(0.2, 0.1, size=(num_left, num_layers))
+            right = rng.normal(0.8, 0.1, size=(num_agents - num_left, num_layers))
             
             opinions = np.vstack([left, right])
-            np.random.shuffle(opinions)
+            rng.shuffle(opinions, axis=0)
             opinions = np.clip(opinions, 0, 1)
             
         elif init_type == 'clustered':
@@ -422,16 +434,16 @@ class EngineInterface:
             cluster_std = params.get('cluster_std', 0.1)
             
             # Assign agents to clusters
-            cluster_ids = np.random.randint(0, num_clusters, size=num_agents)
+            cluster_ids = rng.integers(0, num_clusters, size=num_agents)
             
             # Create cluster centers
-            cluster_centers = np.random.uniform(0, 1, size=(num_clusters, num_layers))
+            cluster_centers = rng.uniform(0, 1, size=(num_clusters, num_layers))
             
             # Initialize opinions around cluster centers
             opinions = np.zeros((num_agents, num_layers))
             for i in range(num_agents):
                 center = cluster_centers[cluster_ids[i]]
-                noise = np.random.normal(0, cluster_std, size=num_layers)
+                noise = rng.normal(0, cluster_std, size=num_layers)
                 opinions[i] = center + noise
             
             opinions = np.clip(opinions, 0, 1)

@@ -2,9 +2,18 @@
 
 import numpy as np
 from sklearn.datasets import make_blobs, make_circles
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> np.ndarray:
+def _generator_seed(rng: np.random.Generator) -> int:
+    """Generate a deterministic int seed for APIs that do not accept Generator."""
+    return int(rng.integers(0, np.iinfo(np.int32).max))
+
+
+def create_spatial_distribution(
+    num_nodes: int,
+    dist_config: Dict[str, Any],
+    rng: Optional[np.random.Generator] = None
+) -> np.ndarray:
     """
     Generates spatial coordinates for nodes within a normalized [0, 1] x [0, 1] space.
     All parameters for the distribution are passed via the dist_config dictionary, 
@@ -21,8 +30,11 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
     Raises:
         ValueError: If the specified distribution type is unknown or parameters are missing/invalid.
     """
+    if rng is None:
+        rng = np.random.default_rng()
+
     dist_type = dist_config.get('type', 'uniform').lower()
-    
+
     locations = None
 
     if dist_type == 'uniform':
@@ -38,7 +50,7 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         # Note: 'low' and 'high' parameters are not needed as they are fixed to [0,0] and [1,1].
         low = [0.0, 0.0]
         high = [1.0, 1.0]
-        locations = np.random.uniform(low=low, high=high, size=(num_nodes, 2))
+        locations = rng.uniform(low=low, high=high, size=(num_nodes, 2))
 
     elif dist_type == 'gaussian':
         # --- Gaussian (Normal) Distribution ---
@@ -56,7 +68,7 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         mean = dist_config.get('mean', [0.5, 0.5])
         std_dev = dist_config.get('std_dev', [0.15, 0.15])
         cov = np.diag(np.square(std_dev))
-        locations = np.random.multivariate_normal(mean=mean, cov=cov, size=num_nodes)
+        locations = rng.multivariate_normal(mean=mean, cov=cov, size=num_nodes)
         # Clip the values to ensure they stay within the [0, 1] bounds
         locations = np.clip(locations, 0.0, 1.0)
     
@@ -97,7 +109,7 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
             mean = sat_conf['center']
             std_dev = sat_conf['std_dev']
             cov = np.diag(np.square(std_dev))
-            sat_locs = np.random.multivariate_normal(mean=mean, cov=cov, size=num_sat_nodes)
+            sat_locs = rng.multivariate_normal(mean=mean, cov=cov, size=num_sat_nodes)
             all_locations.append(sat_locs)
             assigned_nodes += num_sat_nodes
             
@@ -106,11 +118,11 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         mean = main_city_config['center']
         std_dev = main_city_config['std_dev']
         cov = np.diag(np.square(std_dev))
-        main_locs = np.random.multivariate_normal(mean=mean, cov=cov, size=num_main_nodes)
+        main_locs = rng.multivariate_normal(mean=mean, cov=cov, size=num_main_nodes)
         all_locations.append(main_locs)
         
         locations = np.vstack(all_locations)
-        np.random.shuffle(locations) # Shuffle to mix nodes from different cities
+        rng.shuffle(locations) # Shuffle to mix nodes from different cities
         locations = np.clip(locations, 0.0, 1.0)
 
     elif dist_type == 'clustered':
@@ -141,10 +153,12 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
 
         if centers is None:
             locations, _ = make_blobs(n_samples=num_nodes, n_features=2, centers=n_clusters,
-                                      cluster_std=cluster_std, center_box=center_box)
+                                      cluster_std=cluster_std, center_box=center_box,
+                                      random_state=_generator_seed(rng))
         else:
             locations, _ = make_blobs(n_samples=num_nodes, n_features=2, centers=np.array(centers),
-                                      cluster_std=cluster_std)
+                                      cluster_std=cluster_std,
+                                      random_state=_generator_seed(rng))
         # Scale and shift the locations to ensure they are within [0, 1] x [0, 1]
         loc_min, loc_max = locations.min(axis=0), locations.max(axis=0)
         locations = (locations - loc_min) / (loc_max - loc_min)
@@ -172,7 +186,7 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         locations = locations[:num_nodes] # Trim excess points
         
         if jitter > 0:
-            locations += np.random.uniform(-jitter, jitter, size=locations.shape)
+            locations += rng.uniform(-jitter, jitter, size=locations.shape)
             locations = np.clip(locations, 0.0, 1.0) # Ensure jitter does not push points out of bounds
     
     elif dist_type == 'segregated':
@@ -210,11 +224,11 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
             low = [bounds[0], bounds[2]]
             high = [bounds[1], bounds[3]]
             
-            region_locs = np.random.uniform(low=low, high=high, size=(num_region_nodes, 2))
+            region_locs = rng.uniform(low=low, high=high, size=(num_region_nodes, 2))
             all_locations.append(region_locs)
             
         locations = np.vstack(all_locations)
-        np.random.shuffle(locations)
+        rng.shuffle(locations)
         locations = np.clip(locations, 0.0, 1.0)
 
     elif dist_type == 'linear':
@@ -243,7 +257,7 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
             norm = np.linalg.norm(direction_vec)
             if norm > 1e-9:
                 perp_vec = np.array([-direction_vec[1], direction_vec[0]]) / norm
-                noise_vec = np.random.normal(0, noise, size=(num_nodes, 1)) * perp_vec
+                noise_vec = rng.normal(0, noise, size=(num_nodes, 1)) * perp_vec
                 locations += noise_vec
         locations = np.clip(locations, 0.0, 1.0)
 
@@ -293,13 +307,13 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
                 norm = np.linalg.norm(direction_vec)
                 if norm > 1e-9:
                     perp_vec = np.array([-direction_vec[1], direction_vec[0]]) / norm
-                    noise_vec = np.random.normal(0, noise, size=(num_road_nodes, 1)) * perp_vec
+                    noise_vec = rng.normal(0, noise, size=(num_road_nodes, 1)) * perp_vec
                     road_locs += noise_vec
             
             all_locations.append(road_locs)
             
         locations = np.vstack(all_locations)
-        np.random.shuffle(locations)
+        rng.shuffle(locations)
         locations = np.clip(locations, 0.0, 1.0)
 
     elif dist_type == 'circles':
@@ -317,7 +331,12 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         factor = dist_config.get('factor', 0.5)
         noise = dist_config.get('noise', 0.05)
         # make_circles generates data in approx [-1, 1] range centered at (0,0)
-        locations, _ = make_circles(n_samples=num_nodes, factor=factor, noise=noise)
+        locations, _ = make_circles(
+            n_samples=num_nodes,
+            factor=factor,
+            noise=noise,
+            random_state=_generator_seed(rng)
+        )
         # Scale and shift to [0, 1] range
         locations = (locations + 1.0) / 2.0
         locations = np.clip(locations, 0.0, 1.0)
@@ -342,9 +361,9 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         angle_range_rad = np.deg2rad(angle_range_deg)
         
         # Sample r^2 uniformly then take sqrt for uniform spatial density
-        r_squared = np.random.uniform(r_range[0]**2, r_range[1]**2, num_nodes)
+        r_squared = rng.uniform(r_range[0]**2, r_range[1]**2, num_nodes)
         r = np.sqrt(r_squared)
-        theta = np.random.uniform(angle_range_rad[0], angle_range_rad[1], num_nodes)
+        theta = rng.uniform(angle_range_rad[0], angle_range_rad[1], num_nodes)
         
         x = r * np.cos(theta) + center[0]
         y = r * np.sin(theta) + center[1]
@@ -395,11 +414,11 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
              raise ValueError(f"Hex lattice failed to generate enough points. Try adjusting logic.")
              
         # Take the first num_nodes points and shuffle them
-        np.random.shuffle(locations)
+        rng.shuffle(locations)
         locations = locations[:num_nodes]
         
         if jitter > 0:
-            locations += np.random.uniform(-jitter, jitter, size=locations.shape)
+            locations += rng.uniform(-jitter, jitter, size=locations.shape)
             
         locations = np.clip(locations, 0.0, 1.0)
 
@@ -440,16 +459,16 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
             r_range = ring['radius_range']
             
             # Sample r^2 uniformly then take sqrt for uniform spatial density within the annulus
-            r_squared = np.random.uniform(r_range[0]**2, r_range[1]**2, num_ring_nodes)
+            r_squared = rng.uniform(r_range[0]**2, r_range[1]**2, num_ring_nodes)
             r = np.sqrt(r_squared)
-            theta = np.random.uniform(0, 2 * np.pi, num_ring_nodes)
+            theta = rng.uniform(0, 2 * np.pi, num_ring_nodes)
             
             x = r * np.cos(theta) + center[0]
             y = r * np.sin(theta) + center[1]
             all_locations.append(np.vstack([x, y]).T)
             
         locations = np.vstack(all_locations)
-        np.random.shuffle(locations)
+        rng.shuffle(locations)
         locations = np.clip(locations, 0.0, 1.0)
 
     elif dist_type == 'radial_decay':
@@ -473,11 +492,11 @@ def create_spatial_distribution(num_nodes: int, dist_config: Dict[str, Any]) -> 
         strength = dist_config.get('strength', 2.0)
         
         # Generate angles uniformly
-        theta = np.random.uniform(0, 2 * np.pi, num_nodes)
+        theta = rng.uniform(0, 2 * np.pi, num_nodes)
         
         # Generate radii non-uniformly using inverse transform sampling
         # A strength of 2.0 corresponds to a probability density function p(r) proportional to (R-r)
-        u = np.random.uniform(0, 1, num_nodes)
+        u = rng.uniform(0, 1, num_nodes)
         r = max_radius * (1 - u**(1.0 / strength))
         
         x = r * np.cos(theta) + center[0]

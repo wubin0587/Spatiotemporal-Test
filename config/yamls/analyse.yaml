@@ -48,6 +48,6 @@ visual:
   event_timeline: true
   polarization_evolution: true
   network_homophily: false
-  dpi: 150
+  dpi: 300
 
 simulation_meta: {}

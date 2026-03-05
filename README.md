@@ -1,399 +1,504 @@
-# Quick Start: Using Endogenous Threshold Generator
+# Event-Modulated Spatiotemporal Opinion Dynamics Model
 
-## 30-Second Overview
+**Author:** minun · SUFE · minunplus312@gmail.com
 
-The `EndogenousThresholdGenerator` creates events when agent populations in local regions become extreme, polarized, or dense. This enables the simulation to model **online sentiment → offline events** feedback loops.
+---
 
-## Basic Usage
+## Overview
 
-### Step 1: Enable in Configuration
+This framework simulates **online sentiment → offline event feedback loops** using an agent-based opinion dynamics model. Agents hold multidimensional opinions, interact over social networks, move spatially, and both generate and respond to events. The system is designed for research into polarization, radicalization, protest dynamics, and information cascade phenomena.
+
+**Core feedback loop:**
+```
+Agent opinions → Endogenous event generation → Event impact field → Opinion updates → (repeat)
+```
+
+---
+
+## Architecture
+
+The codebase is organized into five main subsystems:
+
+### 1. Simulation Engine (`models/engine/`)
+
+| File | Role |
+|------|------|
+| `core.py` | Abstract base class `SimulationEngine` — defines interface contract |
+| `steps.py` | Concrete `StepExecutor` — implements all simulation logic |
+| `facade.py` | `SimulationFacade` — the **only** public entry point for external code |
+
+**Engine state per step:**
+- `opinion_matrix` — shape `(N, L)`, values ∈ [0, 1], N agents × L opinion layers
+- `agent_positions` — shape `(N, 2)`, spatial coordinates ∈ [0, 1]²
+- `impact_vector` — shape `(N,)`, current event impact on each agent
+- `network_graph` — NetworkX graph for social topology
+
+**Step workflow:**
+1. Generate new events (via EventManager)
+2. Compute impact field I(t) for all agents
+3. Determine interaction pairs (social graph + spatial proximity)
+4. Update opinions via bounded confidence + event modulation
+5. Increment time
+
+### 2. Event System (`models/events/`)
+
+Three event generator types:
+
+| Generator | Config Key | Trigger Mechanism |
+|-----------|------------|-------------------|
+| Exogenous | `exogenous` | Poisson process (time-driven) |
+| Endogenous Threshold | `endogenous_threshold` | Grid-cell attribute threshold |
+| Endogenous Cascade | `endogenous_cascade` | Hawkes process (event-driven) |
+
+**EndogenousThresholdGenerator** monitors one of three spatial attributes:
+
+| Attribute | Formula | High value indicates |
+|-----------|---------|----------------------|
+| `opinion_extremism` | `mean(|opinions − 0.5|)` | Radicalization |
+| `opinion_variance` | `std(opinions)` | Local polarization / conflict |
+| `density` | `num_agents / cell_area` | Spatial gathering |
+
+Each generated event carries: `location`, `intensity`, `content` (topic vector), `polarity`, `diffusion` (spatial spread σ), and `lifecycle` (duration).
+
+### 3. Intervention System (`intervention/`)
+
+Enables controlled experiments and counterfactual analysis.
+
+**Trigger types** (`intervention/trigger.py`):
+
+| Type | Config `type` | Fires when |
+|------|--------------|-----------|
+| `StepTrigger` | `step` | `time_step == step` |
+| `TimeTrigger` | `time` | `current_time >= threshold` |
+| `PolarizationTrigger` | `polarization` | `opinion_std > threshold` |
+| `ImpactTrigger` | `impact` | `mean_impact > threshold` |
+| `CompositeTrigger` | `composite` | AND / OR combination of above |
+
+**Policy types** (via `BasePolicy.from_config()`):
+
+| Policy | Config `type` | Effect |
+|--------|--------------|--------|
+| Opinion nudge | `opinion_nudge` | Shift opinions by delta |
+| Opinion clamp | `opinion_clamp` | Hard-bound opinion range |
+| Network rewire | `network_rewire` | Randomly rewire fraction of edges |
+| Event suppress | `event_suppress` | Disable event source for duration |
+| Dynamics param | `dynamics_param` | Override ε, μ at runtime |
+| Simulation speed | `simulation_speed` | Change dt |
+
+All triggers support `max_fires` (0 = unlimited) and `cooldown` parameters. Setting `auto_checkpoint: true` on a rule creates a `BranchManager` snapshot before each policy application, enabling counterfactual comparison.
+
+### 4. Analysis Pipeline (`analysis/`)
+
+Invoked via `run_analysis(engine, config)` → returns `AnalysisResult`.
+
+**Pipeline stages:**
+
+| Stage | Config key | Output |
+|-------|-----------|--------|
+| Feature extraction | `feature.enabled` | Timeseries + summary statistics |
+| AI narrative parser | `parser.enabled` | Per-section LLM text (requires API key) |
+| Report generation | `report.enabled` | `.md` / `.html` / `.tex` report |
+| Visualization | `visual.enabled` | Static matplotlib figures (Agg) |
+
+**Available figures:** `dashboard`, `opinion_distribution`, `spatial_opinions`, `opinion_timeseries`, `impact_heatmap`, `event_timeline`, `polarization_evolution`, `network_homophily`
+
+**AI parser modes:** `chronicle`, `diagnostic`, `comparative`, `predictive`, `dramatic`
+
+**AI parser themes:** `concert_crowd`, `political_rally`, and others (auto-detected if `theme: null`)
+
+### 5. Configuration Schema
+
+The config must follow strict file-aligned naming. Top-level required keys: `engine`, `events`, `networks`, `spatial`.
 
 ```yaml
+engine:
+  interface:
+    agents:
+      num_agents: 200
+      opinion_layers: 3
+      initial_opinions:
+        type: polarized          # uniform | polarized | random
+        params: {split: 0.5}
+    simulation:
+      total_steps: 500
+      seed: 42
+      record_history: true
+  maths:
+    dynamics:
+      epsilon_base: 0.25         # bounded confidence threshold
+      mu_base: 0.35              # opinion update rate
+      alpha_mod: 0.25            # event amplification
+      beta_mod: 0.15
+      backfire: false
+    field:
+      alpha: 6.0                 # impact decay rate
+      beta: 0.08
+      temporal_window: 100.0
+    topo:
+      threshold: 0.3
+      radius_base: 0.06
+      radius_dynamic: 0.15
+
+networks:
+  builder:
+    layers:
+      - name: social
+        type: small_world        # small_world | barabasi_albert | erdos_renyi
+        params: {n: 200, k: 6, p: 0.1}
+
+spatial:
+  distribution:
+    type: clustered              # clustered | uniform | gaussian
+    n_clusters: 4
+    cluster_std: 0.1
+
 events:
   generation:
+    exogenous:
+      enabled: true
+      seed: 43
+      time_trigger: {type: poisson, lambda_rate: 0.25}
+      attributes:
+        location: {type: uniform}
+        intensity: {type: pareto, shape: 2.5, min_val: 4.0}
+        content: {topic_dim: 3, concentration: [1, 1, 1]}
+        polarity: {type: uniform, min: -0.5, max: 0.5}
+        diffusion: {type: log_normal, log_mean: -2.0, log_std: 0.5}
+        lifecycle:
+          type: bimodal
+          fast_prob: 0.9
+          fast_range: [2, 5]
+          slow_range: [10, 20]
+
     endogenous_threshold:
       enabled: true
-      seed: 2025
-      monitor_attribute: 'opinion_extremism'  # What to monitor
-      critical_threshold: 0.7                 # When to trigger
-      grid_resolution: 15                     # Map divided into 15x15 grid
-      min_agents_in_cell: 5                   # Minimum population
-      cooldown: 30                            # Steps before retrigger
-      
-      attributes:  # Event properties when triggered
-        intensity:
-          base_value: 10.0
-          scale_factor: 15.0
-        content:
-          topic_dim: 3
-          amplify_dominant: true
-        polarity:
-          type: 'dynamic'  # Derived from local variance
-        diffusion:
-          type: 'log_normal'
-          log_mean: -2.3
-          log_std: 0.5
+      seed: 44
+      monitor_attribute: opinion_extremism   # or opinion_variance | density
+      critical_threshold: 0.6
+      grid_resolution: 15                    # NxN spatial grid
+      min_agents_in_cell: 5
+      cooldown: 30
+      attributes:
+        intensity: {base_value: 10.0, scale_factor: 15.0}
+        content: {topic_dim: 3, amplify_dominant: true}
+        polarity: {type: dynamic}
+        diffusion: {type: log_normal, log_mean: -2.3, log_std: 0.5}
         lifecycle:
-          type: 'bimodal'
+          type: bimodal
           fast_prob: 0.8
           fast_range: [3.0, 10.0]
           slow_range: [20.0, 60.0]
+
+    endogenous_cascade:
+      enabled: true
+      seed: 45
+      background_lambda: 0.0
+      mu_multiplier: 0.6
+      attributes:
+        intensity: {cascade_decay: 0.5}
+        diffusion: {inherit_from_parent: true, spatial_mutation: 0.04}
+        lifecycle: {type: uniform, min_sigma: 2.0, max_sigma: 5.0}
 ```
 
-### Step 2: Run Simulation
+---
+
+## Quick Start
+
+### Minimal Runnable Example
 
 ```python
-from models.engine.facade import SimulationFacade
-
-# Load config and run
-sim = SimulationFacade.from_config_file('config.yaml')
-results = sim.run(num_steps=500)
-
-# Check event log
-sim.save_event_log('events.json')
-```
-
-### Step 3: Analyze Results
-
-```python
-# Get event history
-import json
-with open('events.json', 'r') as f:
-    data = json.load(f)
-
-# Count endogenous events
-endogenous_events = [
-    e for e in data['data']['sources'] 
-    if e == 'endogenous_threshold'
-]
-print(f"Generated {len(endogenous_events)} endogenous events")
-
-# Analyze final opinions
-final_opinions = results['final_opinions']
-polarization = np.std(final_opinions)
-print(f"Final polarization: {polarization:.3f}")
-```
-
-## Common Scenarios
-
-### Scenario A: Model Political Protests
-
-**Goal**: Generate events when extreme opinions cluster spatially.
-
-```yaml
-monitor_attribute: 'opinion_extremism'
-critical_threshold: 0.8    # Very extreme
-grid_resolution: 20        # Fine-grained regions
-min_agents_in_cell: 10     # Significant crowd
-cooldown: 50               # Long cooldown (rare events)
-
-attributes:
-  intensity:
-    base_value: 15.0       # High impact
-    scale_factor: 20.0
-  polarity:
-    type: 'dynamic'        # Controversial if variance high
-```
-
-**Expected**: Events trigger in regions with highly extreme, concentrated opinions.
-
-### Scenario B: Model Flash Mobs
-
-**Goal**: Generate events when agent density spikes.
-
-```yaml
-monitor_attribute: 'density'
-critical_threshold: 0.6    # High concentration
-grid_resolution: 25        # Very fine grid
-min_agents_in_cell: 8      # Moderate crowd
-cooldown: 20               # Short cooldown (frequent gatherings)
-
-attributes:
-  intensity:
-    base_value: 5.0        # Moderate impact
-    scale_factor: 8.0
-  lifecycle:
-    type: 'bimodal'
-    fast_prob: 0.9         # Usually short events
-    fast_range: [1.0, 5.0]
-```
-
-**Expected**: Events trigger when agents physically cluster.
-
-### Scenario C: Model Opinion Polarization
-
-**Goal**: Generate events when local disagreement is high.
-
-```yaml
-monitor_attribute: 'opinion_variance'
-critical_threshold: 0.5    # High variance
-grid_resolution: 15
-min_agents_in_cell: 6
-cooldown: 40
-
-attributes:
-  intensity:
-    base_value: 12.0
-    scale_factor: 10.0
-  polarity:
-    type: 'dynamic'        # Always high for this scenario
-  content:
-    amplify_dominant: false  # Keep mixed content
-```
-
-**Expected**: Events trigger in polarized regions (mix of opposing views).
-
-## Tuning Guide
-
-### Problem: No Events Generated
-
-**Symptoms**: Simulation runs but endogenous events never trigger.
-
-**Solutions**:
-
-1. **Lower threshold**:
-   ```yaml
-   critical_threshold: 0.4  # Instead of 0.8
-   ```
-
-2. **Check initial conditions**:
-   ```yaml
-   agents:
-     initial_opinions:
-       type: 'polarized'  # Creates extremism
-       params:
-         split: 0.5
-   ```
-
-3. **Reduce minimum agents**:
-   ```yaml
-   min_agents_in_cell: 3  # Instead of 10
-   ```
-
-4. **Verify spatial clustering**:
-   ```yaml
-   spatial:
-     distribution:
-       type: 'clustered'  # Groups agents
-       n_clusters: 4
-       cluster_std: 0.08
-   ```
-
-### Problem: Too Many Events
-
-**Symptoms**: Events trigger constantly, overwhelming the system.
-
-**Solutions**:
-
-1. **Raise threshold**:
-   ```yaml
-   critical_threshold: 0.75  # Instead of 0.5
-   ```
-
-2. **Increase cooldown**:
-   ```yaml
-   cooldown: 60  # Instead of 20
-   ```
-
-3. **Require more agents**:
-   ```yaml
-   min_agents_in_cell: 12  # Instead of 5
-   ```
-
-### Problem: Events Only in One Location
-
-**Symptoms**: Same grid cell triggers repeatedly.
-
-**Solutions**:
-
-1. **Check cooldown is working**:
-   ```python
-   # In custom code
-   status = generator.get_grid_status(current_time)
-   print(status['cells_in_cooldown'])
-   ```
-
-2. **Increase grid resolution**:
-   ```yaml
-   grid_resolution: 25  # More cells = more diversity
-   ```
-
-3. **Change spatial distribution**:
-   ```yaml
-   spatial:
-     distribution:
-       type: 'uniform'  # Spread agents out
-   ```
-
-## Monitor Attributes Explained
-
-### `opinion_extremism`
-- **Formula**: `mean(|opinions - 0.5|)`
-- **Range**: [0, 0.5]
-- **Interpretation**: How far from center (0.5)
-- **High value means**: Strong beliefs (near 0 or 1)
-- **Use for**: Detecting radicalization
-
-### `opinion_variance`
-- **Formula**: `std(opinions)`
-- **Range**: [0, ~0.5]
-- **Interpretation**: Opinion disagreement
-- **High value means**: Polarization within cell
-- **Use for**: Detecting conflicts
-
-### `density`
-- **Formula**: `num_agents / cell_area`
-- **Range**: [0, 1] (normalized)
-- **Interpretation**: Spatial concentration
-- **High value means**: Many agents in small area
-- **Use for**: Detecting gatherings
-
-## Integration Verification
-
-### Check 1: Is Generator Active?
-
-```python
-from models.events.manager import EventManager
-
-config = {...}  # Your config
-manager = EventManager(config)
-
-print(f"Active generators: {len(manager.generators)}")
-for gen in manager.generators:
-    print(f"  - {gen.__class__.__name__}")
-
-# Should show: EndogenousThresholdGenerator
-```
-
-### Check 2: Are Events Being Created?
-
-```python
-sim = SimulationFacade.from_config_file('config.yaml')
-sim.initialize()
-
-for i in range(20):
-    stats = sim.step()
-    if stats['num_events'] > 0:
-        print(f"Step {i}: {stats['num_events']} events")
-
-# Should see some steps with events > 0
-```
-
-### Check 3: Are Events Endogenous?
-
-```python
-# After simulation
-import json
-with open('events.json', 'r') as f:
-    data = json.load(f)
-
-sources = data['data']['sources']
-endogenous_count = sources.count('endogenous_threshold')
-print(f"Endogenous events: {endogenous_count}/{len(sources)}")
-
-# Should show non-zero endogenous count
-```
-
-## Performance Tips
-
-1. **Grid Resolution**: Start with 10-15, increase if needed
-   - Low (5-10): Fast, coarse regions
-   - Medium (15-20): Balanced
-   - High (25-30): Slow, fine-grained
-
-2. **Cooldown**: Balance frequency vs realism
-   - Short (10-20): Frequent events
-   - Medium (30-50): Balanced
-   - Long (60-100): Rare events
-
-3. **Monitor Attribute**: Choose based on research question
-   - Extremism: Radicalization studies
-   - Variance: Polarization studies
-   - Density: Gathering/protest studies
-
-## Complete Minimal Example
-
-```python
-#!/usr/bin/env python3
-"""Minimal example of endogenous event generation."""
-
 from models.engine.facade import SimulationFacade
 import numpy as np
 
-# Define config
-config = {
-    'agents': {
-        'num_agents': 200,
-        'opinion_layers': 3,
-        'initial_opinions': {'type': 'polarized', 'params': {'split': 0.5}}
-    },
-    'network': {
-        'layers': [{'name': 'social', 'type': 'small_world', 
-                    'params': {'n': 200, 'k': 8, 'p': 0.1}}]
-    },
-    'spatial': {
-        'distribution': {'type': 'clustered', 'n_clusters': 4, 'cluster_std': 0.1}
-    },
-    'events': {
-        'generation': {
-            'endogenous_threshold': {
-                'enabled': True,
-                'seed': 42,
-                'monitor_attribute': 'opinion_extremism',
-                'critical_threshold': 0.6,
-                'grid_resolution': 12,
-                'min_agents_in_cell': 5,
-                'cooldown': 25,
-                'attributes': {
-                    'intensity': {'base_value': 8.0, 'scale_factor': 12.0},
-                    'content': {'topic_dim': 3, 'amplify_dominant': True},
-                    'polarity': {'type': 'dynamic'},
-                    'diffusion': {'type': 'uniform', 'min_sigma': 0.06, 'max_sigma': 0.15},
-                    'lifecycle': {'type': 'uniform', 'min_sigma': 8.0, 'max_sigma': 25.0}
-                }
-            }
-        }
-    },
-    'dynamics': {'epsilon_base': 0.2, 'mu_base': 0.3, 'alpha_mod': 0.2, 'beta_mod': 0.1},
-    'field': {'alpha': 5.0, 'beta': 0.1},
-    'topology': {'threshold': 0.25, 'radius_base': 0.05, 'radius_dynamic': 0.12},
-    'simulation': {'total_steps': 100, 'seed': 42}
-}
+config = { ... }  # see configuration schema above
 
-# Run simulation
 sim = SimulationFacade.from_config_dict(config)
-results = sim.run()
+results = sim.run(num_steps=500)
 
-# Analyze
-print(f"Simulation completed: {results['total_steps']} steps")
-print(f"Final polarization: {np.std(results['final_opinions']):.3f}")
+print(f"Steps: {results['total_steps']}")
+print(f"Final polarization: {np.std(results['final_opinions']):.4f}")
 
-# Save
 sim.save_results('output.npz')
 sim.save_event_log('events.json')
-
-print("Done! Check events.json for endogenous events.")
 ```
 
-Run with:
+### From YAML File
+
+```python
+sim = SimulationFacade.from_config_file('config.yaml')
+results = sim.run()
+```
+
+### Step-by-Step Execution
+
+```python
+sim = SimulationFacade.from_config_dict(config)
+sim.initialize()
+
+for i in range(200):
+    stats = sim.step()
+    # stats keys: step, time, num_events, num_new_events, max_impact, mean_impact
+    print(f"t={stats['time']:.2f}  events={stats['num_events']}  impact={stats['mean_impact']:.3f}")
+```
+
+---
+
+## Running Experiments with Interventions
+
+```python
+from models.engine.facade import SimulationFacade
+from intervention.manager import InterventionManager
+from intervention.trigger import PolarizationTrigger
+from intervention.policies.base import BasePolicy
+
+sim = SimulationFacade.from_config_dict(config)
+sim.initialize()
+
+mgr = InterventionManager()
+mgr.add_rule(
+    trigger=PolarizationTrigger(threshold=0.35, cooldown=20, max_fires=3),
+    policy=BasePolicy.from_config({'type': 'opinion_nudge', 'layer': -1,
+                                   'delta': 0.05, 'direction': 'center'}),
+    label="deradicalization",
+    auto_checkpoint=True,      # saves counterfactual snapshot before each intervention
+)
+
+sim.set_intervention_manager(mgr)
+results = sim.run(num_steps=500)
+
+print(mgr.get_execution_log())             # when interventions fired
+bm = mgr.branch_manager                    # access saved checkpoints
+checkpoints = bm.list_checkpoints()
+```
+
+### From YAML Config
+
+```python
+mgr = InterventionManager.from_config({
+    "interventions": [
+        {
+            "label": "rewire_at_100",
+            "auto_checkpoint": True,
+            "trigger": {"type": "step", "step": 100, "max_fires": 1},
+            "policy": {"type": "network_rewire", "fraction": 0.1, "seed": 99}
+        }
+    ]
+}, sim)
+```
+
+---
+
+## Analysis
+
+```python
+from analysis.manager import run_analysis
+
+analysis_config = {
+    "output": {
+        "dir": "output/run_001",
+        "lang": "zh",           # zh | en
+        "save_figures": True,
+        "save_timeseries": True,
+        "save_features_json": True,
+    },
+    "feature": {"enabled": True, "layer_idx": 0, "include_trends": True},
+    "parser":  {
+        "enabled": True,        # requires api_key
+        "api_key": "sk-...",    # or set OPENAI_API_KEY env var
+        "model": "gpt-4o",
+        "lang": "zh",
+        "narrative_mode": "diagnostic",    # chronicle | diagnostic | comparative | predictive | dramatic
+        "theme": None,                     # auto-detect
+        "sections": ["opinion", "spatial", "topo", "event"],
+        "include_executive_summary": True,
+    },
+    "report":  {"enabled": True, "formats": ["md", "html"], "include_toc": True},
+    "visual":  {
+        "enabled": True,
+        "dashboard": True,
+        "opinion_distribution": True,
+        "spatial_opinions": True,
+        "opinion_timeseries": True,
+        "event_timeline": True,
+        "polarization_evolution": True,
+        "dpi": 150,
+    },
+    "simulation_meta": {"n_agents": 200, "n_steps": 500}
+}
+
+result = run_analysis(sim._engine, analysis_config)
+
+print(result.report_paths)     # {'md': '/output/run_001/report.md', ...}
+print(result.figure_paths)     # {'dashboard': '...', 'spatial_opinions': '...', ...}
+print(result.feature_paths)    # {'timeseries_npz': '...', 'summary_json': '...', ...}
+print(result.errors)           # non-fatal errors
+```
+
+---
+
+## Research Scenario Templates
+
+### A — Radicalization Study
+
+Monitor opinion extremism; events trigger when opinions cluster near 0 or 1.
+
+```yaml
+endogenous_threshold:
+  monitor_attribute: opinion_extremism
+  critical_threshold: 0.8
+  grid_resolution: 20
+  min_agents_in_cell: 10
+  cooldown: 50
+  attributes:
+    intensity: {base_value: 15.0, scale_factor: 20.0}
+    polarity: {type: dynamic}
+```
+
+### B — Polarization / Conflict Study
+
+Monitor intra-cell opinion variance; events trigger in ideologically mixed regions.
+
+```yaml
+endogenous_threshold:
+  monitor_attribute: opinion_variance
+  critical_threshold: 0.5
+  cooldown: 40
+  attributes:
+    intensity: {base_value: 12.0, scale_factor: 10.0}
+    content: {amplify_dominant: false}
+```
+
+### C — Protest / Gathering Study
+
+Monitor agent density; events trigger at spatial concentrations.
+
+```yaml
+endogenous_threshold:
+  monitor_attribute: density
+  critical_threshold: 0.6
+  grid_resolution: 25
+  cooldown: 20
+  attributes:
+    intensity: {base_value: 5.0, scale_factor: 8.0}
+    lifecycle:
+      type: bimodal
+      fast_prob: 0.9
+      fast_range: [1.0, 5.0]
+```
+
+---
+
+## Diagnostics
+
+### No events generating
+
+```yaml
+critical_threshold: 0.4          # lower from 0.8
+min_agents_in_cell: 3            # lower minimum crowd
+```
+Also check that initial opinions create variation: use `type: polarized` not `type: uniform`.
+
+### Too many events
+
+```yaml
+critical_threshold: 0.75
+cooldown: 60
+min_agents_in_cell: 12
+```
+
+### Events only in one location
+
+Increase `grid_resolution` (more cells → more spatial diversity), or switch spatial distribution to `uniform`.
+
+### Verify event composition after a run
+
+```python
+events = sim._engine.event_manager.archive.get_all_events()
+from collections import Counter
+print(Counter(e.source for e in events))
+# Counter({'exogenous': 87, 'endogenous_threshold': 23, 'cascade': 11})
+```
+
+---
+
+## Testing
+
+Run the comprehensive test suite (18 test groups, ~60 individual assertions):
+
 ```bash
-python minimal_example.py
+python test.py
 ```
 
-## Further Reading
+Test output is written to `output/test_run/`. A JSON report is saved at `output/test_run/test_report.json`.
 
-- `ENDOGENOUS_GUIDE.md`: Detailed technical documentation
-- `INTEGRATION_SUMMARY.md`: System-wide integration overview
-- `README.md`: Original model description (Chinese)
-- `models/events/generate/imp.py`: Source code with inline comments
+**Test coverage:**
 
-## Support
+| Range | Area |
+|-------|------|
+| T01–T02 | Config validation, engine initialization |
+| T03–T04 | Step execution, full simulation run |
+| T05 | Intervention hook path |
+| T06 | All trigger types |
+| T07–T09 | InterventionManager lifecycle, from_config, BranchManager |
+| T10 | All policy types |
+| T11–T13 | History recording, state save/load, event log |
+| T14–T15 | Analysis manager (feature, report, visualization) |
+| T16–T18 | Reset/re-run, edge cases, step consistency |
 
-For issues or questions:
-1. Check configuration against examples above
-2. Run `test_endogenous_integration.py`
-3. Enable debug logging:
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
-   ```
+Enable debug logging for detailed output:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+---
+
+## Output Files
+
+| File | Format | Contents |
+|------|--------|----------|
+| `output.npz` | NumPy archive | Final opinions, positions, impact, optional history |
+| `events.json` | JSON | Full event log with sources, times, locations |
+| `checkpoint_*.npz` | NumPy archive | Engine state snapshots for resume / counterfactuals |
+| `features_summary.json` | JSON | Aggregated simulation statistics |
+| `features_final.json` | JSON | Final-timestep feature snapshot |
+| `timeseries.npz` | NumPy archive | All tracked metrics over time |
+| `report.md` / `report.html` | Text / HTML | Analysis report (with or without AI narrative) |
+| `figures/*.png` | PNG | Static visualization figures |
+
+---
+
+## Performance Notes
+
+- **Grid resolution** 10–15 is fast; 25–30 is fine-grained but slower
+- **record_history: true** increases memory proportionally to `total_steps × N × L`
+- **Cascade generator** scales with number of active events; set `mu_multiplier < 1` to prevent supercritical branching
+- For large runs (N > 1000, steps > 2000), consider disabling `network_homophily` and `impact_heatmap` visualizations
+
+---
+
+## File Reference
+
+| Path | Description |
+|------|-------------|
+| `models/engine/facade.py` | `SimulationFacade` — public API |
+| `models/engine/steps.py` | `StepExecutor` — simulation logic |
+| `models/engine/core.py` | `SimulationEngine` — abstract interface |
+| `models/events/generate/imp.py` | Endogenous threshold generator source |
+| `intervention/manager.py` | `InterventionManager` |
+| `intervention/trigger.py` | All trigger types + `from_config` factory |
+| `intervention/policies/base.py` | `BasePolicy` + `from_config` factory |
+| `intervention/branch/checkpoint.py` | `BranchManager` for checkpoints |
+| `analysis/manager.py` | `run_analysis()` entry point |
+| `analysis/feature/pipeline.py` | `FeaturePipeline` |
+| `analysis/parser/client.py` | `ParserClient` (LLM narrative) |
+| `analysis/report/builder.py` | `ReportBuilder` |
+| `analysis/visual/static.py` | All matplotlib figure functions |
+| `test.py` | Comprehensive integration test suite |
+| `ENDOGENOUS_GUIDE.md` | Detailed endogenous generator documentation |
+| `INTEGRATION_SUMMARY.md` | System-wide integration overview |
+
+---
+
+*minun · SUFE · minunplus312@gmail.com*

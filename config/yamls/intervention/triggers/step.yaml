@@ -1,0 +1,5 @@
+type: step
+step:
+cooldown:
+max_fires:
+name:

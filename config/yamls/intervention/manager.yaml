@@ -1,0 +1,5 @@
+interventions:
+  - label:
+    auto_checkpoint:
+    trigger:
+    policy:

@@ -90,6 +90,9 @@ class StepExecutor(SimulationEngine):
         8. Prepare cached structures
         """
         logger.info("=== Initializing Simulation ===")
+
+        seed = self.sim_config.get('seed', 42)
+        np.random.seed(seed)
         
         # Step 1: Validate configuration
         self._validate_config()

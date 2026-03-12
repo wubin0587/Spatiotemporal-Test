@@ -35,6 +35,8 @@ class OnlineResonanceGenerator(EventGenerator):
 
         self.layer_weights = np.asarray(config.get("layer_weights", []), dtype=float)
         self.attributes_config = config.get("attributes", {})
+        self._effective_layer_weights: Optional[np.ndarray] = None
+        self._layer_weights_warning_emitted = False
 
         self.logger = logging.getLogger(__name__)
 
@@ -58,6 +60,38 @@ class OnlineResonanceGenerator(EventGenerator):
                 converted.append(csr_matrix(np.asarray(layer)))
 
         self._network_layers = converted
+        self._effective_layer_weights = self._resolve_layer_weights(len(converted))
+
+    def _resolve_layer_weights(self, n_layers: int) -> np.ndarray:
+        """Resolve configured layer weights to the current network layer count."""
+        if n_layers <= 0:
+            return np.array([], dtype=float)
+
+        if len(self.layer_weights) == 0:
+            return np.ones(n_layers, dtype=float)
+
+        if len(self.layer_weights) == n_layers:
+            if np.sum(self.layer_weights) > 0:
+                return self.layer_weights
+            return np.ones(n_layers, dtype=float)
+
+        if not self._layer_weights_warning_emitted:
+            self.logger.warning(
+                "online_resonance.layer_weights length mismatch: got %d, expected %d; auto-adjusting to match network layers.",
+                len(self.layer_weights),
+                n_layers,
+            )
+            self._layer_weights_warning_emitted = True
+
+        if len(self.layer_weights) > n_layers:
+            adjusted = self.layer_weights[:n_layers]
+        else:
+            adjusted = np.ones(n_layers, dtype=float)
+            adjusted[:len(self.layer_weights)] = self.layer_weights
+
+        if np.sum(adjusted) <= 0:
+            return np.ones(n_layers, dtype=float)
+        return adjusted
 
     def step(self,
              current_time: float,
@@ -125,17 +159,10 @@ class OnlineResonanceGenerator(EventGenerator):
         n_layers = len(self._network_layers)
         n_agents, opinion_dim = opinions.shape
 
-        if len(self.layer_weights) > 0 and len(self.layer_weights) != n_layers:
-            self.logger.warning(
-                "online_resonance.layer_weights length mismatch: got %d, expected %d; fallback to uniform weights.",
-                len(self.layer_weights),
-                n_layers,
-            )
-
-        if len(self.layer_weights) == n_layers and np.sum(self.layer_weights) > 0:
-            weights = self.layer_weights
-        else:
-            weights = np.ones(n_layers, dtype=float)
+        weights = self._effective_layer_weights
+        if weights is None or len(weights) != n_layers:
+            weights = self._resolve_layer_weights(n_layers)
+            self._effective_layer_weights = weights
 
         weighted_sum = np.zeros(n_agents, dtype=float)
 

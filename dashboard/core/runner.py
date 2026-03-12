@@ -90,6 +90,7 @@ class SimulationRunner:
         self._h_sigma:  list[float] = []
         self._h_impact: list[float] = []
         self._h_events: list[int]   = []
+        self._last_figures: list[Any] = []
 
         # Thread-safe access to pause/stop flags
         self._lock = threading.Lock()
@@ -111,11 +112,26 @@ class SimulationRunner:
         with self._lock:
             self._pause_flag = False
 
+    def _close_figures(self) -> None:
+        """Close cached matplotlib figures to avoid figure leaks."""
+        if not self._last_figures:
+            return
+        try:
+            import matplotlib.pyplot as plt
+            for fig in self._last_figures:
+                if fig is not None:
+                    plt.close(fig)
+        except Exception:
+            pass
+        finally:
+            self._last_figures.clear()
+
     def reset(self) -> None:
         """
         Clear history buffers and release the current simulation instance.
         Does not affect stop/pause flags.
         """
+        self._close_figures()
         self._h_time.clear()
         self._h_sigma.clear()
         self._h_impact.clear()
@@ -261,11 +277,14 @@ class SimulationRunner:
         )
 
         # Figures
+        self._close_figures()
         fig_ts   = _renderer.render_timeseries(
             self._h_time, self._h_sigma, self._h_impact, self._h_events)
         fig_sp   = _renderer.render_spatial(self.engine)
         fig_hist = _renderer.render_histogram(self.engine)
         fig_ev   = _renderer.render_events(self._h_time, self._h_events)
+
+        self._last_figures = [fig_ts, fig_sp, fig_hist, fig_ev]
 
         return (
             status,          # 0  status_md
@@ -290,6 +309,7 @@ class SimulationRunner:
         _ensure_imports()
         if self.engine is None:
             return None
+        self._close_figures()
         return _renderer.render_dashboard(
             engine   = self.engine,
             h_time   = self._h_time,

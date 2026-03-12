@@ -27,6 +27,7 @@ Never use module-level globals for simulation state.
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 from pathlib import Path
 
@@ -598,16 +599,22 @@ def build_report_tab(lang: str = "en") -> dict:
 
 def build_app() -> gr.Blocks:
 
-    with gr.Blocks(
-        title="Opinion Dynamics Simulation",
-        css=_CSS,
-        theme=gr.themes.Base(
+    blocks_kwargs: dict = {
+        "title": "Opinion Dynamics Simulation",
+    }
+
+    blocks_sig = inspect.signature(gr.Blocks.__init__)
+    if "css" in blocks_sig.parameters:
+        blocks_kwargs["css"] = _CSS
+    if "theme" in blocks_sig.parameters and hasattr(gr, "themes"):
+        blocks_kwargs["theme"] = gr.themes.Base(
             primary_hue=gr.themes.colors.teal,
             neutral_hue=gr.themes.colors.slate,
             font=[gr.themes.GoogleFont("IBM Plex Sans"), "ui-sans-serif"],
             font_mono=[gr.themes.GoogleFont("IBM Plex Mono"), "ui-monospace"],
-        ),
-    ) as demo:
+        )
+
+    with gr.Blocks(**blocks_kwargs) as demo:
 
         # ── Header ────────────────────────────────────────────────────────
         with gr.Row(elem_id="app-header"):

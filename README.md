@@ -156,7 +156,7 @@ events:
   generation:
     exogenous:
       enabled: true
-      seed: 43
+      seed: 43  # optional: if omitted, derived deterministically from simulation.seed
       time_trigger: {type: poisson, lambda_rate: 0.25}
       attributes:
         location: {type: uniform}
@@ -172,7 +172,7 @@ events:
 
     endogenous_threshold:
       enabled: true
-      seed: 44
+      seed: 44  # optional: if omitted, derived deterministically from simulation.seed
       monitor_attribute: opinion_extremism   # or opinion_variance | density
       critical_threshold: 0.6
       grid_resolution: 15                    # NxN spatial grid
@@ -191,7 +191,7 @@ events:
 
     endogenous_cascade:
       enabled: true
-      seed: 45
+      seed: 45  # optional: if omitted, derived deterministically from simulation.seed
       background_lambda: 0.0
       mu_multiplier: 0.6
       attributes:

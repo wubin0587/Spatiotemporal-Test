@@ -1,0 +1,58 @@
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --line: #e2e8f0;
+  --text: #0f172a;
+  --muted: #475569;
+  --primary: #0d9488;
+  --primary-hover: #0f766e;
+}
+
+body, .gradio-container {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+#app-header,
+#param-panel,
+.gr-box,
+.block {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+}
+
+#param-panel {
+  border-right: 1px solid var(--line);
+}
+
+#run-controls {
+  position: sticky;
+  bottom: 0;
+  padding-top: 8px;
+  background: linear-gradient(to top, #fff, rgba(255,255,255,0.9));
+  border-top: 1px solid var(--line);
+}
+
+#btn-run {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border: 0 !important;
+}
+#btn-run:hover { background: var(--primary-hover) !important; }
+
+.metric-card {
+  border: 1px solid var(--line) !important;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.intervention-rule {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+#summary-df table {
+  font-size: 12px;
+}

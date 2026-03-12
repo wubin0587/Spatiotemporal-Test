@@ -41,10 +41,11 @@ MOUNT_POINTS: dict[str, str | None] = {
     "engine.maths/field":            "engine.maths.field",
     "engine.maths/topo":             "engine.maths.topo",
 
-    # events - three generator blocks
+    # events - generator blocks
     "events/generate.exp":           "events.generation.exogenous",
     "events/generate.imp":           "events.generation.endogenous_threshold",
     "events/generate.cascade":       "events.generation.endogenous_cascade",
+    "events/generate.online":        "events.generation.online_resonance",
 
     # events - diffusion / lifecycle sub-distributions (embeddable or standalone)
     "events/generate.dist.spatial":  "events.generation.exogenous.attributes.diffusion",

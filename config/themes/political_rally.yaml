@@ -23,64 +23,94 @@ _presets:
   spatial.distributions:  segregated
   engine.interface:       polarized
 
-_overrides:
-  engine.interface.agents.num_agents:        400
-  engine.interface.agents.opinion_layers:    3
-  engine.interface.agents.initial_opinions.params.split: 0.5
-
-  engine.interface.simulation.total_steps:   500
-  engine.interface.simulation.seed:          202
-
-  # dynamics: low tolerance (like-minded only), backfire effect enabled
-  engine.maths.dynamics.epsilon_base:   0.18
-  engine.maths.dynamics.mu_base:        0.30
-  engine.maths.dynamics.alpha_mod:      0.35
-  engine.maths.dynamics.beta_mod:       0.20
-  engine.maths.dynamics.backfire:       true
-
-  engine.maths.field.alpha:             6.0
-  engine.maths.field.beta:              0.08
-  engine.maths.field.temporal_window:   120.0
-
-  engine.maths.topo.threshold:          0.20
-  engine.maths.topo.radius_base:        0.05
-  engine.maths.topo.radius_dynamic:     0.12
-
-  # low rewiring probability -> stronger clustering
-  networks.builder.params.n:    400
-  networks.builder.params.k:    8
-  networks.builder.params.p:    0.05
-
-  spatial.distribution.type: segregated
-
-  # exogenous: speeches (moderate frequency, strong polarity)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     202
-  events.generation.exogenous.time_trigger.type:        poisson
-  events.generation.exogenous.time_trigger.lambda_rate: 0.20
-  events.generation.exogenous.attributes.intensity.type:      pareto
-  events.generation.exogenous.attributes.intensity.shape:     2.5
-  events.generation.exogenous.attributes.intensity.min_val:   8.0
-  events.generation.exogenous.attributes.polarity.type:       uniform
-  events.generation.exogenous.attributes.polarity.min:        -1.0
-  events.generation.exogenous.attributes.polarity.max:        1.0
-  events.generation.exogenous.attributes.lifecycle.type:      bimodal
-  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.7
-  events.generation.exogenous.attributes.lifecycle.fast_range: [5, 15]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [20, 50]
-
-  # endogenous threshold: opinion extremism trigger
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
-  events.generation.endogenous_threshold.critical_threshold: 0.65
-  events.generation.endogenous_threshold.grid_resolution:    15
-  events.generation.endogenous_threshold.min_agents_in_cell: 5
-  events.generation.endogenous_threshold.cooldown:           30
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.55
-  events.generation.endogenous_cascade.background_lambda: 0.0
-
+engine:
+  interface:
+    agents:
+      num_agents: 400
+      opinion_layers: 3
+      initial_opinions:
+        params:
+          split: 0.5
+    simulation:
+      total_steps: 500
+      seed: 202
+  maths:
+    dynamics:
+      epsilon_base: 0.18
+      mu_base: 0.30
+      alpha_mod: 0.35
+      beta_mod: 0.20
+      backfire: true
+    field:
+      alpha: 6.0
+      beta: 0.08
+      temporal_window: 120.0
+    topo:
+      threshold: 0.20
+      radius_base: 0.05
+      radius_dynamic: 0.12
+networks:
+  builder:
+    params:
+      n: 400
+      k: 8
+      p: 0.05
+spatial:
+  distribution:
+    type: segregated
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 202
+      time_trigger:
+        type: poisson
+        lambda_rate: 0.20
+      attributes:
+        intensity:
+          type: pareto
+          shape: 2.5
+          min_val: 8.0
+        polarity:
+          type: uniform
+          min: -1.0
+          max: 1.0
+        lifecycle:
+          type: bimodal
+          fast_prob: 0.7
+          fast_range: [5, 15]
+          slow_range: [20, 50]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: opinion_extremism
+      critical_threshold: 0.65
+      grid_resolution: 15
+      min_agents_in_cell: 5
+      cooldown: 30
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.55
+      background_lambda: 0.0
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: diagnostic
   parser.theme: political_rally

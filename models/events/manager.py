@@ -33,6 +33,7 @@ from .generator import EventGenerator
 from .generate.exp import ExogenousShockGenerator
 from .generate.imp import EndogenousThresholdGenerator
 from .generate.cascade import CascadeGenerator
+from .generate.online import OnlineResonanceGenerator
 
 class EventManager:
     """
@@ -56,6 +57,7 @@ class EventManager:
         
         # 2. Initialize Generators based on Config
         self.generators: List[EventGenerator] = []
+        self._online_gen_ref: Optional[OnlineResonanceGenerator] = None
         self._setup_generators()
         
         # Logging
@@ -66,6 +68,7 @@ class EventManager:
         """
         Internal method to instantiate generators if they are enabled in config.
         """
+        self._online_gen_ref = None
         # A. Exogenous Shocks (The "Black Swans")
         exo_conf = self.gen_config.get('exogenous', {})
         if exo_conf.get('enabled', False):
@@ -81,6 +84,20 @@ class EventManager:
         cas_conf = self.gen_config.get('endogenous_cascade', {})
         if cas_conf.get('enabled', False):
             self.generators.append(CascadeGenerator(cas_conf))
+
+        # D. Online Resonance Events (Network Community Dynamics)
+        online_conf = self.gen_config.get('online_resonance', {})
+        if online_conf.get('enabled', False):
+            online_gen = OnlineResonanceGenerator(online_conf)
+            self.generators.append(online_gen)
+            self._online_gen_ref = online_gen
+
+    def set_network_layers(self, layers: List[Any]):
+        """
+        Inject network layers for generators that depend on graph topology.
+        """
+        if self._online_gen_ref is not None:
+            self._online_gen_ref.set_network_layers(layers)
 
     def step(self, 
              current_time: float, 

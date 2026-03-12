@@ -23,63 +23,92 @@ _presets:
   spatial.distributions:  radial_decay      # dense epicenter, sparse periphery
   engine.interface:       uniform
 
-_overrides:
-  engine.interface.agents.num_agents:        400
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params: {}
-
-  engine.interface.simulation.total_steps:   500
-  engine.interface.simulation.seed:          1111
-
-  # early solidarity phase: high tolerance, fast update
-  engine.maths.dynamics.epsilon_base:   0.38
-  engine.maths.dynamics.mu_base:        0.42
-  engine.maths.dynamics.alpha_mod:      0.50
-  engine.maths.dynamics.beta_mod:       0.20
-  engine.maths.dynamics.backfire:       false
-
-  # wide spatial reach for shock diffusion
-  engine.maths.field.alpha:             4.0
-  engine.maths.field.beta:              0.05
-  engine.maths.field.temporal_window:   120.0
-
-  engine.maths.topo.threshold:          0.35
-  engine.maths.topo.radius_base:        0.07
-  engine.maths.topo.radius_dynamic:     0.18
-
-  networks.builder.params.n:  400
-  networks.builder.params.k:  10
-  networks.builder.params.p:  0.12
-
-  spatial.distribution.center:     [0.5, 0.5]
-  spatial.distribution.max_radius: 0.5
-  spatial.distribution.strength:   2.5
-
-  # exogenous: main disaster event (very high intensity) + aftershocks (low freq)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     1111
-  events.generation.exogenous.time_trigger.lambda_rate: 0.06
-  events.generation.exogenous.attributes.intensity.type:    pareto
-  events.generation.exogenous.attributes.intensity.shape:   1.5
-  events.generation.exogenous.attributes.intensity.min_val: 4.0
-  events.generation.exogenous.attributes.polarity.min:      -0.4
-  events.generation.exogenous.attributes.polarity.max:      0.4
-  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.5
-  events.generation.exogenous.attributes.lifecycle.fast_range: [3, 10]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [20, 60]
-
-  # endogenous threshold: density trigger in affected zones
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  density
-  events.generation.endogenous_threshold.critical_threshold: 0.45
-  events.generation.endogenous_threshold.grid_resolution:    18
-  events.generation.endogenous_threshold.min_agents_in_cell: 4
-  events.generation.endogenous_threshold.cooldown:           20
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.60
-  events.generation.endogenous_cascade.background_lambda: 0.01
-
+engine:
+  interface:
+    agents:
+      num_agents: 400
+      opinion_layers: 2
+      initial_opinions:
+        params: {}
+    simulation:
+      total_steps: 500
+      seed: 1111
+  maths:
+    dynamics:
+      epsilon_base: 0.38
+      mu_base: 0.42
+      alpha_mod: 0.50
+      beta_mod: 0.20
+      backfire: false
+    field:
+      alpha: 4.0
+      beta: 0.05
+      temporal_window: 120.0
+    topo:
+      threshold: 0.35
+      radius_base: 0.07
+      radius_dynamic: 0.18
+networks:
+  builder:
+    params:
+      n: 400
+      k: 10
+      p: 0.12
+spatial:
+  distribution:
+    center: [0.5, 0.5]
+    max_radius: 0.5
+    strength: 2.5
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 1111
+      time_trigger:
+        lambda_rate: 0.06
+      attributes:
+        intensity:
+          type: pareto
+          shape: 1.5
+          min_val: 4.0
+        polarity:
+          min: -0.4
+          max: 0.4
+        lifecycle:
+          fast_prob: 0.5
+          fast_range: [3, 10]
+          slow_range: [20, 60]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: density
+      critical_threshold: 0.45
+      grid_resolution: 18
+      min_agents_in_cell: 4
+      cooldown: 20
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.60
+      background_lambda: 0.01
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: chronicle
   parser.theme: disaster_emergency

@@ -23,57 +23,88 @@ _presets:
   spatial.distributions:  gaussian
   engine.interface:       normal
 
-_overrides:
-  engine.interface.agents.num_agents:        350
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params.mean: 0.65   # start with positive bias
-  engine.interface.agents.initial_opinions.params.std:  0.15
-
-  engine.interface.simulation.total_steps:   400
-  engine.interface.simulation.seed:          1212
-
-  engine.maths.dynamics.epsilon_base:   0.32
-  engine.maths.dynamics.mu_base:        0.38
-  engine.maths.dynamics.alpha_mod:      0.40
-  engine.maths.dynamics.beta_mod:       0.18
-  engine.maths.dynamics.backfire:       false
-
-  engine.maths.field.alpha:             7.0
-  engine.maths.field.beta:              0.10
-  engine.maths.field.temporal_window:   80.0
-
-  engine.maths.topo.threshold:          0.30
-  engine.maths.topo.radius_base:        0.06
-  engine.maths.topo.radius_dynamic:     0.15
-
-  networks.builder.params.n:  350
-  networks.builder.params.m:  4
-
-  # exogenous: media coverage (mixed polarity, negatively skewed after crisis)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     1212
-  events.generation.exogenous.time_trigger.lambda_rate: 0.20
-  events.generation.exogenous.attributes.intensity.type:    pareto
-  events.generation.exogenous.attributes.intensity.shape:   2.0
-  events.generation.exogenous.attributes.intensity.min_val: 4.0
-  events.generation.exogenous.attributes.polarity.min:      -0.9
-  events.generation.exogenous.attributes.polarity.max:      0.6   # negative skew after scandal
-  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.75
-  events.generation.exogenous.attributes.lifecycle.fast_range: [2, 8]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [15, 40]
-
-  # endogenous threshold: negative opinion clusters trigger secondary fermentation
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
-  events.generation.endogenous_threshold.critical_threshold: 0.55
-  events.generation.endogenous_threshold.grid_resolution:    12
-  events.generation.endogenous_threshold.min_agents_in_cell: 4
-  events.generation.endogenous_threshold.cooldown:           25
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.65
-  events.generation.endogenous_cascade.background_lambda: 0.02
-
+engine:
+  interface:
+    agents:
+      num_agents: 350
+      opinion_layers: 2
+      initial_opinions:
+        params:
+          mean: 0.65   # start with positive bias
+          std: 0.15
+    simulation:
+      total_steps: 400
+      seed: 1212
+  maths:
+    dynamics:
+      epsilon_base: 0.32
+      mu_base: 0.38
+      alpha_mod: 0.40
+      beta_mod: 0.18
+      backfire: false
+    field:
+      alpha: 7.0
+      beta: 0.10
+      temporal_window: 80.0
+    topo:
+      threshold: 0.30
+      radius_base: 0.06
+      radius_dynamic: 0.15
+networks:
+  builder:
+    params:
+      n: 350
+      m: 4
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 1212
+      time_trigger:
+        lambda_rate: 0.20
+      attributes:
+        intensity:
+          type: pareto
+          shape: 2.0
+          min_val: 4.0
+        polarity:
+          min: -0.9
+          max: 0.6   # negative skew after scandal
+        lifecycle:
+          fast_prob: 0.75
+          fast_range: [2, 8]
+          slow_range: [15, 40]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: opinion_extremism
+      critical_threshold: 0.55
+      grid_resolution: 12
+      min_agents_in_cell: 4
+      cooldown: 25
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.65
+      background_lambda: 0.02
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: diagnostic
   parser.theme: corporate_crisis

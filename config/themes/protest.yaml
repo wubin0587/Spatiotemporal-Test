@@ -23,59 +23,93 @@ _presets:
   spatial.distributions:  clustered
   engine.interface:       polarized
 
-_overrides:
-  engine.interface.agents.num_agents:        350
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params.split: 0.4   # more radicals
-
-  engine.interface.simulation.total_steps:   600
-  engine.interface.simulation.seed:          303
-
-  engine.maths.dynamics.epsilon_base:   0.22
-  engine.maths.dynamics.mu_base:        0.35
-  engine.maths.dynamics.alpha_mod:      0.40
-  engine.maths.dynamics.beta_mod:       0.20
-  engine.maths.dynamics.backfire:       false
-
-  engine.maths.field.alpha:             5.0
-  engine.maths.field.beta:              0.07
-  engine.maths.field.temporal_window:   150.0
-
-  engine.maths.topo.threshold:          0.25
-  engine.maths.topo.radius_base:        0.06
-  engine.maths.topo.radius_dynamic:     0.14
-
-  networks.builder.params.n:  350
-  networks.builder.params.m:  4
-
-  spatial.distribution.n_clusters:  5
-  spatial.distribution.cluster_std: 0.09
-
-  # exogenous: police announcements / counter-group statements (low freq, high polarity)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     303
-  events.generation.exogenous.time_trigger.lambda_rate: 0.12
-  events.generation.exogenous.attributes.intensity.min_val:   10.0
-  events.generation.exogenous.attributes.polarity.min:        -0.8
-  events.generation.exogenous.attributes.polarity.max:        0.8
-  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.6
-  events.generation.exogenous.attributes.lifecycle.fast_range: [3, 8]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [15, 40]
-
-  # endogenous threshold: density trigger (crowd surge -> confrontation)
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  density
-  events.generation.endogenous_threshold.critical_threshold: 0.50
-  events.generation.endogenous_threshold.grid_resolution:    20
-  events.generation.endogenous_threshold.min_agents_in_cell: 4
-  events.generation.endogenous_threshold.cooldown:           25
-  events.generation.endogenous_threshold.attributes.intensity.base_value:   12.0
-  events.generation.endogenous_threshold.attributes.intensity.scale_factor: 18.0
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.65
-  events.generation.endogenous_cascade.background_lambda: 0.0
-
+engine:
+  interface:
+    agents:
+      num_agents: 350
+      opinion_layers: 2
+      initial_opinions:
+        params:
+          split: 0.4   # more radicals
+    simulation:
+      total_steps: 600
+      seed: 303
+  maths:
+    dynamics:
+      epsilon_base: 0.22
+      mu_base: 0.35
+      alpha_mod: 0.40
+      beta_mod: 0.20
+      backfire: false
+    field:
+      alpha: 5.0
+      beta: 0.07
+      temporal_window: 150.0
+    topo:
+      threshold: 0.25
+      radius_base: 0.06
+      radius_dynamic: 0.14
+networks:
+  builder:
+    params:
+      n: 350
+      m: 4
+spatial:
+  distribution:
+    n_clusters: 5
+    cluster_std: 0.09
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 303
+      time_trigger:
+        lambda_rate: 0.12
+      attributes:
+        intensity:
+          min_val: 10.0
+        polarity:
+          min: -0.8
+          max: 0.8
+        lifecycle:
+          fast_prob: 0.6
+          fast_range: [3, 8]
+          slow_range: [15, 40]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: density
+      critical_threshold: 0.50
+      grid_resolution: 20
+      min_agents_in_cell: 4
+      cooldown: 25
+      attributes:
+        intensity:
+          base_value: 12.0
+          scale_factor: 18.0
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.65
+      background_lambda: 0.0
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: chronicle
   parser.theme: protest

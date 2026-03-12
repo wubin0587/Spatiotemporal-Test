@@ -13,6 +13,7 @@ import logging
 import numpy as np
 import networkx as nx
 from scipy.spatial import cKDTree
+from scipy.sparse import csr_matrix
 from typing import Dict, Any, List, Tuple, Optional
 
 # Import external subsystems
@@ -80,7 +81,8 @@ class EngineInterface:
         enabled_generators = [
             gen_config.get('exogenous', {}).get('enabled', False),
             gen_config.get('endogenous_threshold', {}).get('enabled', False),
-            gen_config.get('endogenous_cascade', {}).get('enabled', False)
+            gen_config.get('endogenous_cascade', {}).get('enabled', False),
+            gen_config.get('online_resonance', {}).get('enabled', False),
         ]
         
         if not any(enabled_generators):
@@ -505,27 +507,59 @@ class EngineInterface:
             'opinions': opinions
         }
     
-    def extract_layer_from_multilayer(self, graph: nx.Graph, 
-                                      layer_name: str) -> nx.Graph:
+    def extract_network_layer_matrices(self, graph: nx.Graph, num_agents: int) -> List[csr_matrix]:
         """
-        Extracts a single layer from a multilayer network.
-        
+        Build one sparse adjacency matrix per configured network layer.
+
+        The multilayer builder stores layer membership on edge attributes
+        (`layers` list or fallback `layer` string). This helper converts
+        that representation into a list of `(N, N)` CSR matrices ordered
+        by `networks.builder.layers` in config.
+
         Args:
-            graph (nx.Graph): The multilayer network.
-            layer_name (str): Name of the layer to extract.
-            
+            graph (nx.Graph): Built multilayer graph.
+            num_agents (int): Agent count / matrix dimension.
+
         Returns:
-            nx.Graph: Subgraph containing only nodes from the specified layer.
+            List[csr_matrix]: Per-layer adjacency matrices.
         """
-        # Filter nodes by layer name (assumes nodes are tuples like (layer_name, node_id))
-        layer_nodes = [n for n in graph.nodes() if isinstance(n, tuple) and n[0] == layer_name]
-        
-        if not layer_nodes:
-            self.logger.warning(f"No nodes found for layer '{layer_name}'.")
-            return nx.Graph()
-        
-        return graph.subgraph(layer_nodes).copy()
-    
+        layers_cfg = self.config.get('networks', {}).get('builder', {}).get('layers', [])
+        layer_names = [cfg.get('name') for cfg in layers_cfg if cfg.get('name')]
+
+        # Fallback for legacy single-layer graphs without explicit layer config.
+        if not layer_names:
+            layer_names = ['default']
+
+        layer_edges: Dict[str, List[Tuple[int, int]]] = {name: [] for name in layer_names}
+
+        for u, v, data in graph.edges(data=True):
+            if not (isinstance(u, int) and isinstance(v, int)):
+                continue
+            if u < 0 or v < 0 or u >= num_agents or v >= num_agents:
+                continue
+
+            edge_layers = data.get('layers')
+            if edge_layers is None:
+                single = data.get('layer')
+                edge_layers = [single] if single else []
+
+            if not edge_layers:
+                edge_layers = [layer_names[0]]
+
+            for layer_name in edge_layers:
+                if layer_name in layer_edges:
+                    layer_edges[layer_name].append((u, v))
+
+        matrices: List[csr_matrix] = []
+        for layer_name in layer_names:
+            mat = np.zeros((num_agents, num_agents), dtype=np.float32)
+            for u, v in layer_edges[layer_name]:
+                mat[u, v] = 1.0
+                mat[v, u] = 1.0
+            matrices.append(csr_matrix(mat))
+
+        return matrices
+
     # =========================================================================
     # 6. Summary and Diagnostics
     # =========================================================================

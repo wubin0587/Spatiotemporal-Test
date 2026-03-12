@@ -23,93 +23,105 @@ _presets:
   spatial.distributions:  clustered
   engine.interface:       polarized
 
-_overrides:
-  engine.interface.agents.num_agents:        300
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params.split: 0.5
-
-  engine.interface.simulation.total_steps:   600
-  engine.interface.simulation.seed:          1010
-
-  engine.maths.dynamics.epsilon_base:   0.20
-  engine.maths.dynamics.mu_base:        0.30
-  engine.maths.dynamics.alpha_mod:      0.25
-  engine.maths.dynamics.beta_mod:       0.15
-  engine.maths.dynamics.backfire:       false
-
-  engine.maths.field.alpha:             5.5
-  engine.maths.field.beta:              0.07
-  engine.maths.field.temporal_window:   150.0
-
-  engine.maths.topo.threshold:          0.22
-  engine.maths.topo.radius_base:        0.06
-  engine.maths.topo.radius_dynamic:     0.14
-
-  networks.builder.params.n:  300
-  networks.builder.params.k:  8
-  networks.builder.params.p:  0.08
-
-  spatial.distribution.n_clusters:  4
-  spatial.distribution.cluster_std: 0.10
-
-  # exogenous: low-intensity background (subject to policy suppression)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     1010
-  events.generation.exogenous.time_trigger.lambda_rate: 0.12
-  events.generation.exogenous.attributes.intensity.min_val: 3.0
-  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.80
-  events.generation.exogenous.attributes.lifecycle.fast_range: [2, 6]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [10, 25]
-
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  opinion_extremism
-  events.generation.endogenous_threshold.critical_threshold: 0.65
-  events.generation.endogenous_threshold.grid_resolution:    15
-  events.generation.endogenous_threshold.min_agents_in_cell: 4
-  events.generation.endogenous_threshold.cooldown:           35
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.55
-  events.generation.endogenous_cascade.background_lambda: 0.0
-
-  # three-wave intervention schedule, all auto-checkpointed
-  intervention.interventions:
-    - label: early_rewire
-      auto_checkpoint: true
-      trigger:
-        type: step
-        step: 100
-        max_fires: 1
-      policy:
-        type: network_rewire
-        fraction: 0.15
-        seed: 42
-
-    - label: derad_nudge_on_polarization
-      auto_checkpoint: true
-      trigger:
-        type: polarization
-        threshold: 0.35
-        cooldown: 30
-        max_fires: 3
-      policy:
-        type: opinion_nudge
-        layer: -1
-        delta: 0.05
-        direction: center
-
-    - label: suppress_extreme_events
-      auto_checkpoint: false
-      trigger:
-        type: impact
-        threshold: 0.40
-        cooldown: 20
-        max_fires: 0
-      policy:
-        type: event_suppress
-        source: endogenous_threshold
-        duration: 15
-
+engine:
+  interface:
+    agents:
+      num_agents: 300
+      opinion_layers: 2
+      initial_opinions:
+        params:
+          split: 0.5
+    simulation:
+      total_steps: 600
+      seed: 1010
+  maths:
+    dynamics:
+      epsilon_base: 0.20
+      mu_base: 0.30
+      alpha_mod: 0.25
+      beta_mod: 0.15
+      backfire: false
+    field:
+      alpha: 5.5
+      beta: 0.07
+      temporal_window: 150.0
+    topo:
+      threshold: 0.22
+      radius_base: 0.06
+      radius_dynamic: 0.14
+networks:
+  builder:
+    params:
+      n: 300
+      k: 8
+      p: 0.08
+spatial:
+  distribution:
+    n_clusters: 4
+    cluster_std: 0.10
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 1010
+      time_trigger:
+        lambda_rate: 0.12
+      attributes:
+        intensity:
+          min_val: 3.0
+        lifecycle:
+          fast_prob: 0.80
+          fast_range: [2, 6]
+          slow_range: [10, 25]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: opinion_extremism
+      critical_threshold: 0.65
+      grid_resolution: 15
+      min_agents_in_cell: 4
+      cooldown: 35
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.55
+      background_lambda: 0.0
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
+intervention:
+  interventions: 
+- label: suppress_extreme_events
+auto_checkpoint: false
+trigger: 
+type: event_suppress
+step: 100
+max_fires: 0
+policy: 
+fraction: 0.15
+seed: 42
+threshold: 0.40
+cooldown: 20
+layer: -1
+delta: 0.05
+direction: center
+source: endogenous_threshold
+duration: 15
 _analyse_overrides:
   parser.narrative_mode: comparative
   parser.theme: deradicalization

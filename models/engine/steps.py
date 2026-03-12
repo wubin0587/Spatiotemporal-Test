@@ -129,6 +129,13 @@ class StepExecutor(SimulationEngine):
         
         # Step 7: Initialize event manager
         self.event_manager = self.interface.initialize_event_manager()
+
+        # Inject layer matrices for graph-aware event generators.
+        network_layers = self.interface.extract_network_layer_matrices(
+            self.network_graph,
+            self.num_agents,
+        )
+        self.event_manager.set_network_layers(network_layers)
         
         # Step 8: Create adjacency list for fast neighbor lookups
         self.static_adjacency = self.interface.extract_adjacency_list(

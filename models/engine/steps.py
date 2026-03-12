@@ -23,6 +23,7 @@ from .interface import EngineInterface
 from .maths.field import compute_impact_field
 from .maths.topo import get_interaction_pairs
 from .maths.dynamics import calculate_opinion_change
+from ..utils.random import setup_random_seed
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class StepExecutor(SimulationEngine):
         
         # Random generator for reproducibility
         seed = self.sim_config.get('seed', 42)
+        setup_random_seed(seed)
         self._rng = np.random.default_rng(seed)
         
         logger.info(f"StepExecutor initialized with seed={seed}")
@@ -92,6 +94,7 @@ class StepExecutor(SimulationEngine):
         logger.info("=== Initializing Simulation ===")
 
         seed = self.sim_config.get('seed', 42)
+        setup_random_seed(seed)
         self._rng = np.random.default_rng(seed)
         
         # Step 1: Validate configuration
@@ -248,7 +251,8 @@ class StepExecutor(SimulationEngine):
             kd_tree=self.spatial_index,
             agent_pos=self.agent_positions,
             impact_vector=self.impact_vector,
-            params=self.topology_config
+            params=self.topology_config,
+            rng=self._rng
         )
         
         num_interactions = len(interaction_pairs)

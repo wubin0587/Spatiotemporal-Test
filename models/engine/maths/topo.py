@@ -7,9 +7,11 @@
 
 import numpy as np
 from scipy.spatial import cKDTree
+from typing import Optional
 
 def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndarray, 
-                          impact_vector: np.ndarray, params: dict) -> list:
+                          impact_vector: np.ndarray, params: dict,
+                          rng: Optional[np.random.Generator] = None) -> list:
     """
     Generates interaction pairs based on agent states (Passive/Active).
     
@@ -43,6 +45,8 @@ def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndar
     """
     pairs = []
     N = len(static_adj)
+    if rng is None:
+        rng = np.random.default_rng()
     
     threshold = params.get('threshold', 0.2)
     r_base = params.get('radius_base', 0.05)
@@ -61,7 +65,7 @@ def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndar
         if neighbors:
             # Randomly select one social connection to interact with
             # (Simulates the algorithm pushing a post from a friend)
-            j = np.random.choice(neighbors)
+            j = int(rng.choice(neighbors))
             pairs.append((i, j))
 
     # --- Case B: Active Agents (Spatial Interactions) ---
@@ -84,7 +88,7 @@ def get_interaction_pairs(static_adj: list, kd_tree: cKDTree, agent_pos: np.ndar
             
             if valid_neighbors:
                 # Pick one random spatial neighbor
-                j = np.random.choice(valid_neighbors)
+                j = int(rng.choice(valid_neighbors))
                 pairs.append((i, j))
                 
     return pairs

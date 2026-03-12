@@ -21,6 +21,7 @@ Usage in Engine:
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
+import copy
 
 # Import Data Structures
 from .base import Event
@@ -34,6 +35,21 @@ from .generate.exp import ExogenousShockGenerator
 from .generate.imp import EndogenousThresholdGenerator
 from .generate.cascade import CascadeGenerator
 from .generate.online import OnlineResonanceGenerator
+
+
+def _derive_seed(root_seed: int, namespace: str) -> int:
+    """
+    Deterministically derive a module seed from a root seed.
+
+    This keeps each module RNG independent while still controlled by one
+    top-level seed.
+    """
+    modulus = 2**32
+    acc = int(root_seed) % modulus
+    for ch in namespace:
+        # a simple deterministic rolling hash (stable across runs)
+        acc = ((acc * 131) + ord(ch)) % modulus
+    return acc
 
 class EventManager:
     """
@@ -69,26 +85,42 @@ class EventManager:
         Internal method to instantiate generators if they are enabled in config.
         """
         self._online_gen_ref = None
+        sim_cfg = self.config.get('engine', {}).get('interface', {}).get('simulation', {})
+        root_seed = int(sim_cfg.get('seed', 42))
+
+        def _with_seed(conf: Dict[str, Any], namespace: str) -> Dict[str, Any]:
+            cfg = copy.deepcopy(conf)
+            cfg.setdefault('seed', _derive_seed(root_seed, namespace))
+            return cfg
+
         # A. Exogenous Shocks (The "Black Swans")
         exo_conf = self.gen_config.get('exogenous', {})
         if exo_conf.get('enabled', False):
-            self.generators.append(ExogenousShockGenerator(exo_conf))
+            self.generators.append(
+                ExogenousShockGenerator(_with_seed(exo_conf, 'events.exogenous'))
+            )
             
         # B. Endogenous Thresholds (The "Grey Rhinos")
         # Note: Passes the full gen_config section or specific subsection
         imp_conf = self.gen_config.get('endogenous_threshold', {})
         if imp_conf.get('enabled', False):
-            self.generators.append(EndogenousThresholdGenerator(imp_conf))
+            self.generators.append(
+                EndogenousThresholdGenerator(_with_seed(imp_conf, 'events.endogenous_threshold'))
+            )
             
         # C. Cascading Events (The "Chain Reactions")
         cas_conf = self.gen_config.get('endogenous_cascade', {})
         if cas_conf.get('enabled', False):
-            self.generators.append(CascadeGenerator(cas_conf))
+            self.generators.append(
+                CascadeGenerator(_with_seed(cas_conf, 'events.endogenous_cascade'))
+            )
 
         # D. Online Resonance Events (Network Community Dynamics)
         online_conf = self.gen_config.get('online_resonance', {})
         if online_conf.get('enabled', False):
-            online_gen = OnlineResonanceGenerator(online_conf)
+            online_gen = OnlineResonanceGenerator(
+                _with_seed(online_conf, 'events.online_resonance')
+            )
             self.generators.append(online_gen)
             self._online_gen_ref = online_gen
 

@@ -24,68 +24,91 @@ _presets:
   spatial.distributions:  clustered
   engine.interface:       polarized     # some initial spread; converges quickly
 
-_overrides:
-  # agent population
-  engine.interface.agents.num_agents:        500
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params.split: 0.5
-
-  # simulation length
-  engine.interface.simulation.total_steps:   300
-  engine.interface.simulation.seed:          101
-
-  # dynamics: high tolerance, fast update (crowd emotional contagion)
-  engine.maths.dynamics.epsilon_base:   0.40
-  engine.maths.dynamics.mu_base:        0.45
-  engine.maths.dynamics.alpha_mod:      0.30
-  engine.maths.dynamics.beta_mod:       0.10
-  engine.maths.dynamics.backfire:       false
-
-  # impact field: fast decay (localized events)
-  engine.maths.field.alpha:             8.0
-  engine.maths.field.beta:              0.10
-  engine.maths.field.temporal_window:   60.0
-
-  # topology: tight local connections
-  engine.maths.topo.threshold:          0.35
-  engine.maths.topo.radius_base:        0.04
-  engine.maths.topo.radius_dynamic:     0.10
-
-  # network: dense small-world
-  networks.builder.params.n:    500
-  networks.builder.params.k:    10
-  networks.builder.params.p:    0.15
-
-  # spatial: tightly clustered (stage area + audience zones)
-  spatial.distribution.n_clusters:  3
-  spatial.distribution.cluster_std: 0.07
-
-  # exogenous events: frequent high-intensity short pulses (set changes, fireworks)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     201
-  events.generation.exogenous.time_trigger.type:        poisson
-  events.generation.exogenous.time_trigger.lambda_rate: 0.50
-  events.generation.exogenous.attributes.intensity.type:      pareto
-  events.generation.exogenous.attributes.intensity.shape:     2.0
-  events.generation.exogenous.attributes.intensity.min_val:   6.0
-  events.generation.exogenous.attributes.lifecycle.type:      bimodal
-  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.95
-  events.generation.exogenous.attributes.lifecycle.fast_range: [1, 4]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [8, 15]
-
-  # endogenous threshold: density trigger (crowd surges)
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  density
-  events.generation.endogenous_threshold.critical_threshold: 0.55
-  events.generation.endogenous_threshold.grid_resolution:    20
-  events.generation.endogenous_threshold.min_agents_in_cell: 6
-  events.generation.endogenous_threshold.cooldown:           15
-
-  # cascade: active (emotional contagion chains)
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.7
-  events.generation.endogenous_cascade.background_lambda: 0.0
-
+engine:
+  interface:
+    agents:
+      num_agents: 500
+      opinion_layers: 2
+      initial_opinions:
+        params:
+          split: 0.5
+    simulation:
+      total_steps: 300
+      seed: 101
+  maths:
+    dynamics:
+      epsilon_base: 0.40
+      mu_base: 0.45
+      alpha_mod: 0.30
+      beta_mod: 0.10
+      backfire: false
+    field:
+      alpha: 8.0
+      beta: 0.10
+      temporal_window: 60.0
+    topo:
+      threshold: 0.35
+      radius_base: 0.04
+      radius_dynamic: 0.10
+networks:
+  builder:
+    params:
+      n: 500
+      k: 10
+      p: 0.15
+spatial:
+  distribution:
+    n_clusters: 3
+    cluster_std: 0.07
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 201
+      time_trigger:
+        type: poisson
+        lambda_rate: 0.50
+      attributes:
+        intensity:
+          type: pareto
+          shape: 2.0
+          min_val: 6.0
+        lifecycle:
+          type: bimodal
+          fast_prob: 0.95
+          fast_range: [1, 4]
+          slow_range: [8, 15]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: density
+      critical_threshold: 0.55
+      grid_resolution: 20
+      min_agents_in_cell: 6
+      cooldown: 15
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.7
+      background_lambda: 0.0
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: dramatic
   parser.theme: concert_crowd

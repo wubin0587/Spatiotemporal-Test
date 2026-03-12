@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 def _rebuild_adjacency(engine: Any) -> None:
-    """Rebuild the engine's static_adjacency list from its network_graph."""
+    """Rebuild topology caches after a network intervention."""
     N = engine.num_agents
     adj = [[] for _ in range(N)]
     for u, v in engine.network_graph.edges():
@@ -67,7 +67,13 @@ def _rebuild_adjacency(engine: Any) -> None:
             adj[u].append(v)
             adj[v].append(u)
     engine.static_adjacency = adj
-    logger.debug("static_adjacency rebuilt after network intervention.")
+
+    # Keep graph-aware generators (e.g., online resonance) synchronized.
+    if getattr(engine, 'event_manager', None) is not None and hasattr(engine, 'interface'):
+        layer_mats = engine.interface.extract_network_layer_matrices(engine.network_graph, N)
+        engine.event_manager.set_network_layers(layer_mats)
+
+    logger.debug("static_adjacency and event network layers rebuilt after network intervention.")
 
 
 # =============================================================================

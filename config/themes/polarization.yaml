@@ -23,60 +23,94 @@ _presets:
   spatial.distributions:  gaussian
   engine.interface:       normal
 
-_overrides:
-  engine.interface.agents.num_agents:        400
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params.mean: 0.5
-  engine.interface.agents.initial_opinions.params.std:  0.22
-
-  engine.interface.simulation.total_steps:   1000
-  engine.interface.simulation.seed:          505
-
-  engine.maths.dynamics.epsilon_base:   0.22
-  engine.maths.dynamics.mu_base:        0.28
-  engine.maths.dynamics.alpha_mod:      0.20
-  engine.maths.dynamics.beta_mod:       0.12
-  engine.maths.dynamics.backfire:       false
-
-  engine.maths.field.alpha:             5.0
-  engine.maths.field.beta:              0.07
-  engine.maths.field.temporal_window:   200.0
-
-  engine.maths.topo.threshold:          0.22
-  engine.maths.topo.radius_base:        0.06
-  engine.maths.topo.radius_dynamic:     0.15
-
-  networks.builder.params.n:  400
-  networks.builder.params.k:  8
-  networks.builder.params.p:  0.08
-
-  spatial.distribution.mean:    [0.5, 0.5]
-  spatial.distribution.std_dev: [0.20, 0.20]
-
-  # endogenous threshold: variance trigger in mixed-opinion zones (core mechanism)
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  opinion_variance
-  events.generation.endogenous_threshold.critical_threshold: 0.45
-  events.generation.endogenous_threshold.grid_resolution:    15
-  events.generation.endogenous_threshold.min_agents_in_cell: 5
-  events.generation.endogenous_threshold.cooldown:           40
-  events.generation.endogenous_threshold.attributes.intensity.base_value:   10.0
-  events.generation.endogenous_threshold.attributes.intensity.scale_factor: 12.0
-  events.generation.endogenous_threshold.attributes.content.amplify_dominant: false
-
-  # exogenous: low-intensity background media events
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     505
-  events.generation.exogenous.time_trigger.lambda_rate: 0.15
-  events.generation.exogenous.attributes.intensity.min_val: 3.0
-  events.generation.exogenous.attributes.lifecycle.fast_prob: 0.75
-  events.generation.exogenous.attributes.lifecycle.fast_range: [3, 8]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [20, 50]
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.50
-  events.generation.endogenous_cascade.background_lambda: 0.0
-
+engine:
+  interface:
+    agents:
+      num_agents: 400
+      opinion_layers: 2
+      initial_opinions:
+        params:
+          mean: 0.5
+          std: 0.22
+    simulation:
+      total_steps: 1000
+      seed: 505
+  maths:
+    dynamics:
+      epsilon_base: 0.22
+      mu_base: 0.28
+      alpha_mod: 0.20
+      beta_mod: 0.12
+      backfire: false
+    field:
+      alpha: 5.0
+      beta: 0.07
+      temporal_window: 200.0
+    topo:
+      threshold: 0.22
+      radius_base: 0.06
+      radius_dynamic: 0.15
+networks:
+  builder:
+    params:
+      n: 400
+      k: 8
+      p: 0.08
+spatial:
+  distribution:
+    mean: [0.5, 0.5]
+    std_dev: [0.20, 0.20]
+events:
+  generation:
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: opinion_variance
+      critical_threshold: 0.45
+      grid_resolution: 15
+      min_agents_in_cell: 5
+      cooldown: 40
+      attributes:
+        intensity:
+          base_value: 10.0
+          scale_factor: 12.0
+        content:
+          amplify_dominant: false
+    exogenous:
+      enabled: true
+      seed: 505
+      time_trigger:
+        lambda_rate: 0.15
+      attributes:
+        intensity:
+          min_val: 3.0
+        lifecycle:
+          fast_prob: 0.75
+          fast_range: [3, 8]
+          slow_range: [20, 50]
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.50
+      background_lambda: 0.0
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: predictive
   parser.theme: polarization

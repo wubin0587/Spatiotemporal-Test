@@ -23,56 +23,84 @@ _presets:
   spatial.distributions:  uniform          # online; space is irrelevant
   engine.interface:       uniform
 
-_overrides:
-  engine.interface.agents.num_agents:        500
-  engine.interface.agents.opinion_layers:    4   # multi-topic dimensions
-  engine.interface.agents.initial_opinions.params: {}
-
-  engine.interface.simulation.total_steps:   300
-  engine.interface.simulation.seed:          909
-
-  # dynamics: fast update (retweet = instant opinion update)
-  engine.maths.dynamics.epsilon_base:   0.35
-  engine.maths.dynamics.mu_base:        0.50
-  engine.maths.dynamics.alpha_mod:      0.55
-  engine.maths.dynamics.beta_mod:       0.30
-  engine.maths.dynamics.backfire:       false
-
-  # impact field: fast decay (trends die quickly)
-  engine.maths.field.alpha:             10.0
-  engine.maths.field.beta:              0.15
-  engine.maths.field.temporal_window:   50.0
-
-  engine.maths.topo.threshold:          0.40
-  engine.maths.topo.radius_base:        0.10
-  engine.maths.topo.radius_dynamic:     0.25
-
-  # stronger BA hubs (higher m)
-  networks.builder.params.n:  500
-  networks.builder.params.m:  5
-
-  # exogenous: influencer posts (rare, very high intensity, heavy-tailed)
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     909
-  events.generation.exogenous.time_trigger.lambda_rate: 0.08
-  events.generation.exogenous.attributes.intensity.type:    pareto
-  events.generation.exogenous.attributes.intensity.shape:   1.5   # extreme heavy tail
-  events.generation.exogenous.attributes.intensity.min_val: 8.0
-  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.95
-  events.generation.exogenous.attributes.lifecycle.fast_range: [1, 3]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [5, 12]
-
-  # endogenous threshold: disabled (pure cascade scenario)
-  events.generation.endogenous_threshold.enabled: false
-
-  # cascade: core mechanism, near-critical (mu_multiplier close to 1)
-  events.generation.endogenous_cascade.enabled:           true
-  events.generation.endogenous_cascade.mu_multiplier:     0.85
-  events.generation.endogenous_cascade.background_lambda: 0.05   # persistent organic posting
-  events.generation.endogenous_cascade.attributes.intensity.cascade_decay: 0.4
-  events.generation.endogenous_cascade.attributes.diffusion.inherit_from_parent: true
-  events.generation.endogenous_cascade.attributes.diffusion.spatial_mutation:    0.02
-
+engine:
+  interface:
+    agents:
+      num_agents: 500
+      opinion_layers: 4   # multi-topic dimensions
+      initial_opinions:
+        params: {}
+    simulation:
+      total_steps: 300
+      seed: 909
+  maths:
+    dynamics:
+      epsilon_base: 0.35
+      mu_base: 0.50
+      alpha_mod: 0.55
+      beta_mod: 0.30
+      backfire: false
+    field:
+      alpha: 10.0
+      beta: 0.15
+      temporal_window: 50.0
+    topo:
+      threshold: 0.40
+      radius_base: 0.10
+      radius_dynamic: 0.25
+networks:
+  builder:
+    params:
+      n: 500
+      m: 5
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 909
+      time_trigger:
+        lambda_rate: 0.08
+      attributes:
+        intensity:
+          type: pareto
+          shape: 1.5   # extreme heavy tail
+          min_val: 8.0
+        lifecycle:
+          fast_prob: 0.95
+          fast_range: [1, 3]
+          slow_range: [5, 12]
+    endogenous_threshold:
+      enabled: false
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.85
+      background_lambda: 0.05   # persistent organic posting
+      attributes:
+        intensity:
+          cascade_decay: 0.4
+        diffusion:
+          inherit_from_parent: true
+          spatial_mutation: 0.02
+    online_resonance:
+      enabled: true
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: predictive
   parser.theme: online_cascade

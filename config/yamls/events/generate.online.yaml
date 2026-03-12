@@ -1,0 +1,12 @@
+enabled:
+seed:
+check_interval:
+smoothing_window:
+convergence_threshold:
+conflict_threshold:
+min_community_size:
+layer_weights:
+attributes:
+  intensity:
+  diffusion:
+  lifecycle:

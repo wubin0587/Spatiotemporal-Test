@@ -183,6 +183,25 @@ def _make_config(
                         "lifecycle": {"type": "uniform", "min_sigma": 2.0, "max_sigma": 5.0},
                     },
                 },
+                "online_resonance": {
+                    "enabled": True,
+                    "seed": seed + 4,
+                    "check_interval": 2,
+                    "smoothing_window": 4,
+                    "convergence_threshold": 0.01,
+                    "conflict_threshold": 0.01,
+                    "min_community_size": 3,
+                    "layer_weights": [1.0],
+                    "attributes": {
+                        "intensity": {"base_value": 4.0, "size_scale": 8.0},
+                        "diffusion": {
+                            "dispersion_scale": 1.0,
+                            "min_sigma": 0.03,
+                            "max_sigma": 0.3,
+                        },
+                        "lifecycle": {"type": "uniform", "min_sigma": 3.0, "max_sigma": 8.0},
+                    },
+                },
             }
         },
     }
@@ -274,13 +293,22 @@ def test_t02_initialization():
     except Exception as e:
         _record("T02-d", False, str(e))
 
+    # 验证 online_resonance 已注入网络层
+    try:
+        online_gen = getattr(sim._engine.event_manager, "_online_gen_ref", None)
+        ok = online_gen is not None and online_gen._network_layers is not None and len(online_gen._network_layers) == 1
+        _record("T02-e", ok, f"online_layers={0 if online_gen is None or online_gen._network_layers is None else len(online_gen._network_layers)}")
+    except Exception as e:
+        _record("T02-e", False, str(e))
+
+
     # 未初始化时访问应报错
     sim2 = SimulationFacade.from_config_dict(_make_config())
     try:
         sim2.get_current_state()
-        _record("T02-e", False, "应抛出 RuntimeError")
+        _record("T02-f", False, "应抛出 RuntimeError")
     except RuntimeError:
-        _record("T02-e", True, "未初始化访问 → RuntimeError 正确")
+        _record("T02-f", True, "未初始化访问 → RuntimeError 正确")
 
     return sim
 

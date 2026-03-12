@@ -23,66 +23,94 @@ _presets:
   spatial.distributions:  satellite
   engine.interface:       uniform
 
-_overrides:
-  engine.interface.agents.num_agents:        600
-  engine.interface.agents.opinion_layers:    2
-  engine.interface.agents.initial_opinions.params: {}
-
-  engine.interface.simulation.total_steps:   400
-  engine.interface.simulation.seed:          808
-
-  engine.maths.dynamics.epsilon_base:   0.35
-  engine.maths.dynamics.mu_base:        0.25
-  engine.maths.dynamics.alpha_mod:      0.20
-  engine.maths.dynamics.beta_mod:       0.10
-  engine.maths.dynamics.backfire:       false
-
-  engine.maths.field.alpha:             7.0
-  engine.maths.field.beta:              0.10
-  engine.maths.field.temporal_window:   80.0
-
-  engine.maths.topo.threshold:          0.35
-  engine.maths.topo.radius_base:        0.05
-  engine.maths.topo.radius_dynamic:     0.12
-
-  networks.builder.params.n:      600
-  networks.builder.params.radius: 0.06
-
-  # spatial: main city core + two satellite commercial zones
-  spatial.distribution.main_city.center:     [0.52, 0.52]
-  spatial.distribution.main_city.proportion: 0.65
-  spatial.distribution.main_city.std_dev:    0.12
-  spatial.distribution.satellites:
-    - center: [0.18, 0.75]
-      proportion: 0.20
-      std_dev: 0.06
-    - center: [0.80, 0.25]
-      proportion: 0.15
-      std_dev: 0.05
-
-  # exogenous: moderate-frequency, short-lived trending moments
-  events.generation.exogenous.enabled:  true
-  events.generation.exogenous.seed:     808
-  events.generation.exogenous.time_trigger.lambda_rate: 0.30
-  events.generation.exogenous.attributes.intensity.min_val: 3.0
-  events.generation.exogenous.attributes.polarity.min:      -0.3
-  events.generation.exogenous.attributes.polarity.max:      0.3
-  events.generation.exogenous.attributes.lifecycle.fast_prob:  0.90
-  events.generation.exogenous.attributes.lifecycle.fast_range: [1, 5]
-  events.generation.exogenous.attributes.lifecycle.slow_range: [8, 20]
-
-  # endogenous threshold: density trigger (spontaneous crowd hotspots)
-  events.generation.endogenous_threshold.enabled:            true
-  events.generation.endogenous_threshold.monitor_attribute:  density
-  events.generation.endogenous_threshold.critical_threshold: 0.50
-  events.generation.endogenous_threshold.grid_resolution:    25
-  events.generation.endogenous_threshold.min_agents_in_cell: 5
-  events.generation.endogenous_threshold.cooldown:           15
-
-  events.generation.endogenous_cascade.enabled:          true
-  events.generation.endogenous_cascade.mu_multiplier:    0.45
-  events.generation.endogenous_cascade.background_lambda: 0.0
-
+engine:
+  interface:
+    agents:
+      num_agents: 600
+      opinion_layers: 2
+      initial_opinions:
+        params: {}
+    simulation:
+      total_steps: 400
+      seed: 808
+  maths:
+    dynamics:
+      epsilon_base: 0.35
+      mu_base: 0.25
+      alpha_mod: 0.20
+      beta_mod: 0.10
+      backfire: false
+    field:
+      alpha: 7.0
+      beta: 0.10
+      temporal_window: 80.0
+    topo:
+      threshold: 0.35
+      radius_base: 0.05
+      radius_dynamic: 0.12
+networks:
+  builder:
+    params:
+      n: 600
+      radius: 0.06
+spatial:
+  distribution:
+    main_city:
+      center: [0.52, 0.52]
+      proportion: 0.65
+      std_dev: 0.12
+    satellites: 
+- center: [0.80, 0.25]
+proportion: 0.15
+std_dev: 0.05
+events:
+  generation:
+    exogenous:
+      enabled: true
+      seed: 808
+      time_trigger:
+        lambda_rate: 0.30
+      attributes:
+        intensity:
+          min_val: 3.0
+        polarity:
+          min: -0.3
+          max: 0.3
+        lifecycle:
+          fast_prob: 0.90
+          fast_range: [1, 5]
+          slow_range: [8, 20]
+    endogenous_threshold:
+      enabled: true
+      monitor_attribute: density
+      critical_threshold: 0.50
+      grid_resolution: 25
+      min_agents_in_cell: 5
+      cooldown: 15
+    endogenous_cascade:
+      enabled: true
+      mu_multiplier: 0.45
+      background_lambda: 0.0
+    online_resonance:
+      enabled: false
+      check_interval: 2
+      smoothing_window: 5
+      convergence_threshold: 0.01
+      conflict_threshold: 0.01
+      min_community_size: 3
+      layer_weights: [1.0, 1.0, 1.0]
+      attributes:
+        intensity:
+          base_value: 4.0
+          size_scale: 8.0
+        diffusion:
+          dispersion_scale: 1.0
+          min_sigma: 0.03
+          max_sigma: 0.3
+        lifecycle:
+          type: uniform
+          min_sigma: 3.0
+          max_sigma: 8.0
 _analyse_overrides:
   parser.narrative_mode: dramatic
   parser.theme: urban_crowd

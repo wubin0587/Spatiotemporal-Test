@@ -225,9 +225,20 @@ class CascadeGenerator(EventGenerator):
         # Calculate child location
         offset_x = distance * np.cos(angle)
         offset_y = distance * np.sin(angle)
-        
-        child_loc = parent.loc + np.array([offset_x, offset_y])
-        
+
+        if parent.source.startswith("online_resonance") and agents_state is not None:
+            positions = agents_state.get('positions') if isinstance(agents_state, dict) else None
+            community_agents = parent.meta.get('community_agents', []) if parent.meta else []
+
+            if positions is not None and len(community_agents) > 0:
+                sampled_agent = int(self.rng.choice(community_agents))
+                base_loc = np.asarray(positions[sampled_agent], dtype=float).copy()
+                child_loc = base_loc + np.array([offset_x, offset_y])
+            else:
+                child_loc = parent.loc + np.array([offset_x, offset_y])
+        else:
+            child_loc = parent.loc + np.array([offset_x, offset_y])
+
         # Ensure within map bounds [0, 1]
         child_loc = np.clip(child_loc, 0.0, 1.0)
         

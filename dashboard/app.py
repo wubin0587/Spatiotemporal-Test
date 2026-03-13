@@ -1,7 +1,7 @@
 """
 app.py
 
-Opinion Dynamics Simulation Dashboard — Gradio entry point.
+Opinion Dynamics Simulation Dashboard — Gradio entry point (v2).
 
 Launch:
     python app.py
@@ -9,888 +9,641 @@ Launch:
 
 Architecture
 ------------
-  Left column  (scale=3): parameter panel — all simulation inputs
-  Right column (scale=7): tabbed main panel
-    Tab 0: Monitor  — real-time charts + metric cards
-    Tab 1: Analysis — post-run dashboard + feature summary
-    Tab 2: Report   — AI-assisted report generation
+Single gr.Blocks with sidebar-driven multi-page navigation.
+7 pages are rendered as gr.Group containers; only one is visible at a time.
+The sidebar (200px fixed) persists across all pages.
 
-Language toggle (en / zh) in the header hot-swaps all component labels
-without a full page reload.
+Pages
+-----
+  P1  home              — Welcome + preset loader
+  P2  dashboard_settings— Refresh / display preferences
+  P3  model_config      — Model parameters (all Accordions)
+  P4  analysis_config   — Output dir, AI, report format
+  P5  intervention      — Intervention rules
+  P6  experiment        — Checklist (A) + Live monitor (B)
+  P7  results           — Dynamic / Static / Features / AI Report
 
 Session isolation
 -----------------
-One SimulationRunner instance per Gradio session is stored in gr.State.
-Never use module-level globals for simulation state.
+One SimulationRunner per Gradio session stored in gr.State.
 """
 
 from __future__ import annotations
 
 import argparse
-import inspect
 import sys
+import tempfile
 from pathlib import Path
 
-# Make sure project root is on the path
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import gradio as gr
-import numpy as np
 
-from core.defaults    import DEFAULTS, get_label, get_info, get_choices
+from core.defaults import DEFAULTS
 from core.config_bridge import build_config_from_ui, build_analysis_config_from_ui
-from core.runner      import SimulationRunner
+from core.runner import SimulationRunner
+from core.validator import validate_all, summarize
+
+from ui.components.sidebar import (
+    SidebarComponents,
+    build_sidebar,
+    update_status,
+    bind_nav_events,
+    NAV_ITEMS,
+)
+from ui.panels.page_welcome import (
+    WelcomeComponents,
+    build_welcome_page,
+    refresh_lang as welcome_refresh_lang,
+    on_preset_selected,
+    PRESET_KEYS,
+)
+from ui.panels.page_dashboard_settings import (
+    DashboardSettingsComponents,
+    build_dashboard_settings_page,
+)
+from ui.panels.page_model_config import (
+    ModelConfigComponents,
+    build_model_config_page,
+)
+from ui.panels.page_analysis_config import (
+    AnalysisConfigComponents,
+    build_analysis_config_page,
+)
+from ui.panels.page_intervention import (
+    InterventionPageComponents,
+    build_intervention_page,
+    collect_rules,
+)
+from ui.panels.page_experiment import (
+    ExperimentComponents,
+    build_experiment_page,
+    render_checklist,
+    render_snapshot,
+    update_checklist,
+    transition_to_monitor,
+    transition_to_checklist,
+    on_run_complete,
+)
+from ui.panels.page_results import (
+    ResultsComponents,
+    build_results_page,
+    render_features_table,
+    switch_subtab,
+    populate_from_run,
+    _SUBTABS,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CSS  (light, clean, research-tool aesthetic)
+# Page key registry (must match NAV_ITEMS order in sidebar.py)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_CSS = """
-/* ── Fonts ──────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+ALL_PAGES = [
+    "home",
+    "dashboard_settings",
+    "model_config",
+    "analysis_config",
+    "intervention",
+    "experiment",
+    "results",
+]
 
-body, .gradio-container {
-    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif !important;
-    background: #f1f5f9 !important;
-}
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
-#app-header {
-    background: #ffffff;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 14px 24px 10px;
-    margin-bottom: 0;
-}
-#app-header h1 {
-    font-size: 1.15rem !important;
-    font-weight: 600 !important;
-    color: #0f172a !important;
-    margin: 0 !important;
-    letter-spacing: -0.02em;
-}
-#status-badge {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.78rem !important;
-    color: #475569 !important;
-    padding: 2px 10px !important;
-    border-radius: 12px !important;
-    background: #f1f5f9 !important;
-    border: 1px solid #e2e8f0 !important;
-}
-
-/* ── Left parameter panel ───────────────────────────────────────────────── */
-#param-panel {
-    background: #ffffff;
-    border-right: 1px solid #e2e8f0;
-    min-height: calc(100vh - 80px);
-    padding: 0 !important;
-    overflow-y: auto;
-}
-#param-panel .accordion {
-    border: none !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-}
-#param-panel .accordion button {
-    font-size: 0.76rem !important;
-    font-weight: 500 !important;
-    color: #334155 !important;
-    padding: 8px 14px !important;
-    background: #f8fafc !important;
-    letter-spacing: 0.01em;
-}
-#param-panel label span {
-    font-size: 0.73rem !important;
-    color: #475569 !important;
-}
-#param-panel input[type="number"],
-#param-panel input[type="text"],
-#param-panel select {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.78rem !important;
-    border-color: #e2e8f0 !important;
-    border-radius: 4px !important;
-}
-
-/* ── Run control row ────────────────────────────────────────────────────── */
-#run-controls {
-    background: #ffffff;
-    border-top: 1px solid #e2e8f0;
-    padding: 10px 14px !important;
-    position: sticky;
-    bottom: 0;
-}
-#btn-run {
-    background: #0d9488 !important;
-    color: #ffffff !important;
-    border: none !important;
-    font-weight: 500 !important;
-    font-size: 0.82rem !important;
-    border-radius: 5px !important;
-}
-#btn-run:hover { background: #0f766e !important; }
-#btn-stop {
-    background: #fee2e2 !important;
-    color: #b91c1c !important;
-    border: 1px solid #fecaca !important;
-    border-radius: 5px !important;
-    font-size: 0.78rem !important;
-}
-#btn-reset {
-    background: #f8fafc !important;
-    color: #475569 !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 5px !important;
-    font-size: 0.78rem !important;
-}
-#btn-pause {
-    background: #fffbeb !important;
-    color: #92400e !important;
-    border: 1px solid #fde68a !important;
-    border-radius: 5px !important;
-    font-size: 0.78rem !important;
-}
-
-/* ── Metric cards ───────────────────────────────────────────────────────── */
-.metric-card .wrap {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    padding: 6px 10px !important;
-}
-.metric-card input {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 1.1rem !important;
-    font-weight: 500 !important;
-    color: #0f172a !important;
-    text-align: center !important;
-    border: none !important;
-    background: transparent !important;
-}
-.metric-card label span {
-    font-size: 0.68rem !important;
-    color: #64748b !important;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-/* ── Status bar ─────────────────────────────────────────────────────────── */
-#step-label {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.78rem !important;
-    color: #475569 !important;
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 4px !important;
-    padding: 4px 10px !important;
-}
-
-/* ── Tab titles ─────────────────────────────────────────────────────────── */
-.tab-nav button {
-    font-size: 0.8rem !important;
-    font-weight: 500 !important;
-    color: #64748b !important;
-    border-bottom: 2px solid transparent !important;
-}
-.tab-nav button.selected {
-    color: #0d9488 !important;
-    border-bottom-color: #0d9488 !important;
-}
-
-/* ── Chart images ───────────────────────────────────────────────────────── */
-.chart-tile img {
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-    width: 100%;
-    object-fit: contain;
-}
-.chart-tile .label {
-    font-size: 0.72rem !important;
-    color: #64748b !important;
-}
-
-/* ── Preset / YAML row ──────────────────────────────────────────────────── */
-#preset-row select {
-    font-size: 0.76rem !important;
-}
-
-/* ── Summary table ──────────────────────────────────────────────────────── */
-#summary-df table {
-    font-size: 0.76rem !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-}
-"""
+def switch_page(target: str) -> list:
+    """Return 7 gr.update(visible=...) — one per page group."""
+    return [gr.update(visible=(p == target)) for p in ALL_PAGES]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Param panel builder
+# CSS path
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _num(key: str, lang: str, precision: int = 2, **kw) -> gr.Number:
-    lbl, info = get_label(key, lang), get_info(key, lang)
-    return gr.Number(
-        label=lbl, info=info,
-        value=DEFAULTS[key],
-        precision=precision,
-        **kw,
-    )
-
-
-def _check(key: str, lang: str) -> gr.Checkbox:
-    lbl, info = get_label(key, lang), get_info(key, lang)
-    return gr.Checkbox(label=lbl, info=info, value=DEFAULTS[key])
-
-
-def _drop(key: str, lang: str) -> gr.Dropdown:
-    lbl, info = get_label(key, lang), get_info(key, lang)
-    return gr.Dropdown(
-        label=lbl, info=info,
-        choices=get_choices(key),
-        value=DEFAULTS[key],
-    )
-
-
-def build_param_panel(lang: str = "en") -> dict:
-    """Build the left-side parameter panel. Returns a flat dict of components."""
-    c: dict = {}
-
-    # ── Preset row ─────────────────────────────────────────────────────────
-    with gr.Group(elem_id="preset-row"):
-        with gr.Row():
-            c["preset"] = gr.Dropdown(
-                label=get_label("_sec_preset", lang),
-                choices=["(none)"],
-                value="(none)",
-                scale=4,
-            )
-            c["load_preset_btn"] = gr.Button(
-                get_label("_btn_load_preset", lang), scale=1, size="sm")
-            c["export_yaml_btn"] = gr.Button(
-                get_label("_btn_export_yaml", lang), scale=1, size="sm")
-
-    # ── Agent & Simulation ─────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_agent", lang), open=True):
-        with gr.Row():
-            c["num_agents"]     = _num("num_agents", lang, 0,
-                                       minimum=10, maximum=5000)
-            c["opinion_layers"] = _num("opinion_layers", lang, 0,
-                                       minimum=1, maximum=10)
-        with gr.Row():
-            c["total_steps"]    = _num("total_steps", lang, 0,
-                                       minimum=1, maximum=100000)
-            c["seed"]           = _num("seed", lang, 0, minimum=0)
-        with gr.Row():
-            c["record_history"] = _check("record_history", lang)
-        with gr.Row():
-            c["init_type"]      = _drop("init_type", lang)
-            c["init_split"]     = _num("init_split", lang, 2,
-                                       minimum=0.0, maximum=1.0)
-
-    # ── Dynamics ───────────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_dynamics", lang), open=True):
-        with gr.Row():
-            c["epsilon_base"]  = _num("epsilon_base", lang, 3,
-                                      minimum=0.01, maximum=1.0)
-            c["mu_base"]       = _num("mu_base", lang, 3,
-                                      minimum=0.01, maximum=1.0)
-        with gr.Row():
-            c["alpha_mod"]     = _num("alpha_mod", lang, 3,
-                                      minimum=0.0, maximum=2.0)
-            c["beta_mod"]      = _num("beta_mod", lang, 3,
-                                      minimum=0.0, maximum=2.0)
-        c["backfire"]          = _check("backfire", lang)
-
-    # ── Influence Field ────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_field", lang), open=False):
-        with gr.Row():
-            c["field_alpha"]      = _num("field_alpha", lang, 2, minimum=0.1)
-            c["field_beta"]       = _num("field_beta", lang, 4, minimum=0.001)
-        c["temporal_window"]      = _num("temporal_window", lang, 1, minimum=1.0)
-
-    # ── Topology ───────────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_topo", lang), open=False):
-        with gr.Row():
-            c["topo_threshold"] = _num("topo_threshold", lang, 3,
-                                       minimum=0.0, maximum=1.0)
-            c["radius_base"]    = _num("radius_base", lang, 3, minimum=0.01)
-        c["radius_dynamic"]     = _num("radius_dynamic", lang, 3, minimum=0.01)
-
-    # ── Network ────────────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_network", lang), open=False):
-        c["net_type"] = _drop("net_type", lang)
-        with gr.Row():
-            c["sw_k"]   = _num("sw_k", lang, 0, minimum=2)
-            c["sw_p"]   = _num("sw_p", lang, 3, minimum=0.0, maximum=1.0)
-        c["sf_m"]       = _num("sf_m", lang, 0, minimum=1)
-
-    # ── Spatial ────────────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_spatial", lang), open=False):
-        c["spatial_type"] = _drop("spatial_type", lang)
-        with gr.Row():
-            c["n_clusters"]  = _num("n_clusters", lang, 0, minimum=1)
-            c["cluster_std"] = _num("cluster_std", lang, 3, minimum=0.01)
-
-    # ── Exogenous Events ───────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_exo", lang), open=False):
-        c["exo_enabled"]  = _check("exo_enabled", lang)
-        with gr.Row():
-            c["exo_seed"]   = _num("exo_seed", lang, 0, minimum=0)
-            c["exo_lambda"] = _num("exo_lambda", lang, 3, minimum=0.0)
-        with gr.Row():
-            c["exo_intensity_shape"] = _num("exo_intensity_shape", lang, 2,
-                                            minimum=0.1)
-            c["exo_intensity_min"]   = _num("exo_intensity_min", lang, 2,
-                                            minimum=0.0)
-        with gr.Row():
-            c["exo_polarity_min"] = _num("exo_polarity_min", lang, 2,
-                                         minimum=-1.0, maximum=0.0)
-            c["exo_polarity_max"] = _num("exo_polarity_max", lang, 2,
-                                         minimum=0.0, maximum=1.0)
-        c["exo_concentration"] = gr.Textbox(
-            label=get_label("exo_concentration", lang),
-            info=get_info("exo_concentration", lang),
-            value=DEFAULTS["exo_concentration"],
-            placeholder="e.g. 1,1,1",
-        )
-
-    # ── Endogenous Threshold Events ────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_endo", lang), open=False):
-        c["endo_enabled"] = _check("endo_enabled", lang)
-        with gr.Row():
-            c["endo_seed"]      = _num("endo_seed", lang, 0, minimum=0)
-            c["endo_threshold"] = _num("endo_threshold", lang, 3, minimum=0.0)
-        c["endo_monitor"] = _drop("endo_monitor", lang)
-        with gr.Row():
-            c["endo_grid"]       = _num("endo_grid", lang, 0, minimum=2)
-            c["endo_cooldown"]   = _num("endo_cooldown", lang, 0, minimum=0)
-        c["endo_min_agents"]     = _num("endo_min_agents", lang, 0, minimum=1)
-        with gr.Row():
-            c["endo_base_intensity"] = _num("endo_base_intensity", lang, 2,
-                                            minimum=0.0)
-            c["endo_scale"]          = _num("endo_scale", lang, 2, minimum=0.0)
-
-    # ── Cascade Events ─────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_cascade", lang), open=False):
-        c["cascade_enabled"] = _check("cascade_enabled", lang)
-        with gr.Row():
-            c["cascade_seed"]      = _num("cascade_seed", lang, 0, minimum=0)
-            c["cascade_bg_lambda"] = _num("cascade_bg_lambda", lang, 3,
-                                          minimum=0.0)
-        with gr.Row():
-            c["cascade_mu_mult"] = _num("cascade_mu_mult", lang, 3,
-                                        minimum=0.0, maximum=1.0)
-            c["cascade_decay"]   = _num("cascade_decay", lang, 3,
-                                        minimum=0.0, maximum=1.0)
-
-    # ── Online Resonance Events ────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_online", lang), open=False):
-        c["online_enabled"] = _check("online_enabled", lang)
-        with gr.Row():
-            c["online_seed"]  = _num("online_seed", lang, 0, minimum=0)
-            c["online_check"] = _num("online_check", lang, 0, minimum=1)
-        with gr.Row():
-            c["online_smooth"]      = _num("online_smooth", lang, 0, minimum=1)
-            c["online_min_community"] = _num("online_min_community", lang, 0,
-                                              minimum=1)
-        with gr.Row():
-            c["online_convergence"] = _num("online_convergence", lang, 4,
-                                           minimum=0.0)
-            c["online_conflict"]    = _num("online_conflict", lang, 4,
-                                           minimum=0.0)
-        with gr.Row():
-            c["online_base"]  = _num("online_base", lang, 2, minimum=0.0)
-            c["online_scale"] = _num("online_scale", lang, 2, minimum=0.0)
-
-    # ── Analysis Output ────────────────────────────────────────────────────
-    with gr.Accordion(get_label("_sec_analysis", lang), open=False):
-        c["output_dir"]  = gr.Textbox(
-            label=get_label("output_dir", lang),
-            info=get_info("output_dir", lang),
-            value=DEFAULTS["output_dir"],
-        )
-        with gr.Row():
-            c["output_lang"]  = _drop("output_lang", lang)
-            c["layer_idx"]    = _num("layer_idx", lang, 0, minimum=0)
-        with gr.Row():
-            c["include_trends"]      = _check("include_trends", lang)
-            c["save_timeseries"]     = _check("save_timeseries", lang)
-            c["save_features_json"]  = _check("save_features_json", lang)
-        c["refresh_every"] = _num("refresh_every", lang, 0, minimum=1)
-
-    return c
+_CSS_PATH = Path(__file__).parent / "assets" / "custom.css"
+_CSS = _CSS_PATH.read_text(encoding="utf-8") if _CSS_PATH.exists() else ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Monitor tab
-# ─────────────────────────────────────────────────────────────────────────────
-
-def build_monitor_tab(lang: str = "en") -> dict:
-    m: dict = {}
-
-    with gr.Row():
-        m["status_md"] = gr.Markdown(
-            "● Ready",
-            elem_id="step-label",
-        )
-
-    # Metric cards
-    with gr.Row():
-        with gr.Column(min_width=90, elem_classes="metric-card"):
-            m["metric_sigma"]     = gr.Number(label="σ polarization",
-                                               value=0.0, precision=4,
-                                               interactive=False)
-        with gr.Column(min_width=90, elem_classes="metric-card"):
-            m["metric_mean"]      = gr.Number(label="μ mean opinion",
-                                               value=0.0, precision=4,
-                                               interactive=False)
-        with gr.Column(min_width=90, elem_classes="metric-card"):
-            m["metric_impact"]    = gr.Number(label="mean impact",
-                                               value=0.0, precision=4,
-                                               interactive=False)
-        with gr.Column(min_width=90, elem_classes="metric-card"):
-            m["metric_events"]    = gr.Number(label="events",
-                                               value=0, precision=0,
-                                               interactive=False)
-        with gr.Column(min_width=90, elem_classes="metric-card"):
-            m["metric_consensus"] = gr.Number(label="consensus",
-                                               value=0.0, precision=4,
-                                               interactive=False)
-
-    # 2 × 2 chart grid
-    with gr.Row():
-        with gr.Column(elem_classes="chart-tile"):
-            m["plot_timeseries"] = gr.Plot(label="Polarization Timeline")
-        with gr.Column(elem_classes="chart-tile"):
-            m["plot_spatial"]    = gr.Plot(label="Spatial Opinion Distribution")
-    with gr.Row():
-        with gr.Column(elem_classes="chart-tile"):
-            m["plot_histogram"]  = gr.Plot(label="Opinion Histogram")
-        with gr.Column(elem_classes="chart-tile"):
-            m["plot_events"]     = gr.Plot(label="Event Timeline")
-
-    # Pause / Stop inside the tab (mirrors the sidebar buttons)
-    with gr.Row():
-        m["pause_btn"] = gr.Button(
-            "⏸  Pause", size="sm", interactive=False, elem_id="btn-pause")
-        m["stop_btn"]  = gr.Button(
-            "⏹  Stop",  size="sm", interactive=False, elem_id="btn-stop",
-            variant="stop")
-
-    return m
-
-
-def monitor_output_list(m: dict) -> list:
-    """
-    Return the outputs list for run_btn.click(), in the same order
-    as SimulationRunner.run_stream() yields.
-    """
-    return [
-        m["status_md"],       # 0
-        m["metric_sigma"],    # 1
-        m["metric_mean"],     # 2
-        m["metric_impact"],   # 3
-        m["metric_events"],   # 4
-        m["metric_consensus"],# 5
-        m["plot_timeseries"], # 6
-        m["plot_spatial"],    # 7
-        m["plot_histogram"],  # 8
-        m["plot_events"],     # 9
-        m["pause_btn"],       # 10
-        m["stop_btn"],        # 11
-    ]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Analysis tab (post-run)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def build_analysis_tab(lang: str = "en") -> dict:
-    a: dict = {}
-    a["dashboard_plot"] = gr.Plot(label="Simulation Dashboard")
-    a["summary_df"]     = gr.DataFrame(
-        label="Feature Summary",
-        elem_id="summary-df",
-        wrap=True,
-    )
-    with gr.Row():
-        a["run_analysis_btn"] = gr.Button(
-            "Run Analysis" if lang == "en" else "运行分析",
-            variant="primary", size="sm",
-        )
-        a["download_btn"] = gr.DownloadButton(
-            "Download Figures" if lang == "en" else "下载图表",
-            size="sm",
-        )
-    a["analysis_status"] = gr.Markdown("")
-    return a
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Report tab
-# ─────────────────────────────────────────────────────────────────────────────
-
-def build_report_tab(lang: str = "en") -> dict:
-    r: dict = {}
-    with gr.Row():
-        r["report_fmt"]   = gr.Dropdown(
-            label="Format" if lang == "en" else "格式",
-            choices=["md", "html"],
-            value="md",
-        )
-        r["report_title"] = gr.Textbox(
-            label="Title (optional)" if lang == "en" else "标题（可选）",
-            placeholder="auto-generated" if lang == "en" else "自动生成",
-        )
-
-    with gr.Accordion("AI Parser (optional)" if lang == "en" else "AI 解析（可选）",
-                      open=False):
-        r["ai_enabled"]   = gr.Checkbox(
-            label="Enable AI analysis" if lang == "en" else "启用 AI 分析",
-            value=False,
-        )
-        r["api_key"]      = gr.Textbox(
-            label="API Key", type="password",
-            placeholder="sk-..." if lang == "en" else "sk-...",
-        )
-        r["ai_model"]     = gr.Dropdown(
-            label="Model",
-            choices=["gpt-4o", "gpt-4-turbo", "claude-sonnet-4-6"],
-            value="gpt-4o",
-        )
-        with gr.Row():
-            r["narrative_mode"] = gr.Dropdown(
-                label="Narrative Mode" if lang == "en" else "叙事风格",
-                choices=["", "chronicle", "diagnostic",
-                         "comparative", "predictive", "dramatic"],
-                value="",
-            )
-            r["theme_name"] = gr.Dropdown(
-                label="Theme" if lang == "en" else "主题",
-                choices=[""],
-                value="",
-            )
-
-    r["generate_btn"]  = gr.Button(
-        get_label("_btn_generate_report", lang) if lang == "zh" else "📄  Generate Report",
-        variant="primary",
-    )
-    r["report_preview"] = gr.Markdown(
-        "_No report yet._" if lang == "en" else "_尚无报告。_"
-    )
-    with gr.Row():
-        r["download_report_btn"] = gr.DownloadButton(
-            "Download Report" if lang == "en" else "下载报告",
-            size="sm",
-        )
-        r["download_features_btn"] = gr.DownloadButton(
-            "Download Features" if lang == "en" else "下载特征数据",
-            size="sm",
-        )
-    return r
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Gradio app assembly
+# App builder
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_app() -> gr.Blocks:
 
-    blocks_kwargs: dict = {
-        "title": "Opinion Dynamics Simulation",
-    }
-
-    blocks_sig = inspect.signature(gr.Blocks.__init__)
-    if "css" in blocks_sig.parameters:
-        blocks_kwargs["css"] = _CSS
-    if "theme" in blocks_sig.parameters and hasattr(gr, "themes"):
-        blocks_kwargs["theme"] = gr.themes.Base(
-            primary_hue=gr.themes.colors.teal,
-            neutral_hue=gr.themes.colors.slate,
-            font=[gr.themes.GoogleFont("IBM Plex Sans"), "ui-sans-serif"],
-            font_mono=[gr.themes.GoogleFont("IBM Plex Mono"), "ui-monospace"],
-        )
-
-    with gr.Blocks(**blocks_kwargs) as demo:
-
-        # ── Header ────────────────────────────────────────────────────────
-        with gr.Row(elem_id="app-header"):
-            with gr.Column(scale=8):
-                gr.Markdown(
-                    "# 🔬  Opinion Dynamics Simulation",
-                )
-            with gr.Column(scale=2):
-                lang_toggle = gr.Radio(
-                    choices=["en", "zh"],
-                    value="en",
-                    label="",
-                    interactive=True,
-                    elem_id="lang-toggle",
-                )
+    with gr.Blocks(
+        title="Opinion Dynamics Simulation",
+        css=_CSS,
+    ) as demo:
 
         # ── Session state ─────────────────────────────────────────────────
         runner_state = gr.State(lambda: SimulationRunner())
-        lang_state   = gr.State("en")
+        lang_state   = gr.State("zh")
 
-        # ── Main layout: left panel + right tabs ──────────────────────────
-        with gr.Row(equal_height=False):
+        # ── Top bar ───────────────────────────────────────────────────────
+        with gr.Row(elem_id="top-bar"):
+            gr.HTML(
+                '<a id="top-bar-logo" href="#">🔬 Opinion Dynamics</a>'
+            )
+            top_status_html = gr.HTML(
+                value='<div id="top-bar-status">● 就绪</div>',
+                elem_id="top-bar-status-wrap",
+            )
+            gr.HTML('<div id="top-bar-spacer"></div>')
+            # Language toggle (thin buttons, right-aligned)
+            with gr.Row(elem_id="lang-toggle-group"):
+                lang_zh_top = gr.Button(
+                    "中文", size="sm",
+                    elem_id="top-lang-zh",
+                    elem_classes="lang-btn selected",
+                )
+                lang_en_top = gr.Button(
+                    "EN", size="sm",
+                    elem_id="top-lang-en",
+                    elem_classes="lang-btn",
+                )
 
-            # ── Left: parameter panel ──────────────────────────────────────
-            with gr.Column(scale=3, elem_id="param-panel"):
-                params = build_param_panel(lang="en")
+        # ── App shell: sidebar + content ──────────────────────────────────
+        with gr.Row(elem_id="app-shell", equal_height=False):
 
-                # Run controls (sticky footer)
-                with gr.Row(elem_id="run-controls"):
-                    run_btn   = gr.Button(
-                        "▶  Run Simulation",
-                        variant="primary", size="lg",
-                        elem_id="btn-run",
+            # ── Sidebar ───────────────────────────────────────────────────
+            with gr.Column(elem_id="sidebar", min_width=200, scale=0):
+                sidebar = build_sidebar(lang="zh")
+
+            # ── Page content area ──────────────────────────────────────────
+            with gr.Column(elem_id="page-content", scale=1):
+
+                # P1 — Home (visible by default)
+                with gr.Group(visible=True, elem_id="page-home") as page_home:
+                    welcome = build_welcome_page(lang="zh")
+
+                # P2 — Dashboard Settings
+                with gr.Group(visible=False, elem_id="page-dashboard") as page_dashboard:
+                    dash_settings = build_dashboard_settings_page(
+                        lang="zh", defaults=DEFAULTS
                     )
-                with gr.Row():
-                    pause_sidebar = gr.Button(
-                        "⏸  Pause", size="sm", interactive=False,
-                        elem_id="btn-pause")
-                    stop_sidebar  = gr.Button(
-                        "⏹  Stop",  size="sm", interactive=False,
-                        variant="stop", elem_id="btn-stop")
-                    reset_btn     = gr.Button(
-                        "↺  Reset", size="sm",
-                        elem_id="btn-reset")
 
-            # ── Right: tabs ────────────────────────────────────────────────
-            with gr.Column(scale=7):
-                with gr.Tabs() as tabs:
+                # P3 — Model Config
+                with gr.Group(visible=False, elem_id="page-model") as page_model:
+                    model_cfg = build_model_config_page(
+                        lang="zh", defaults=DEFAULTS
+                    )
 
-                    with gr.Tab("📡  Monitor"):
-                        monitor = build_monitor_tab(lang="en")
+                # P4 — Analysis Config
+                with gr.Group(visible=False, elem_id="page-analysis-cfg") as page_analysis_cfg:
+                    analysis_cfg = build_analysis_config_page(
+                        lang="zh", defaults=DEFAULTS
+                    )
 
-                    with gr.Tab("📊  Analysis"):
-                        analysis = build_analysis_tab(lang="en")
+                # P5 — Intervention
+                with gr.Group(visible=False, elem_id="page-intervention") as page_intervention:
+                    interv = build_intervention_page(lang="zh")
 
-                    with gr.Tab("📄  Report"):
-                        report = build_report_tab(lang="en")
+                # P6 — Experiment
+                with gr.Group(visible=False, elem_id="page-experiment") as page_experiment:
+                    experiment = build_experiment_page(lang="zh", defaults=DEFAULTS)
 
-        # ─────────────────────────────────────────────────────────────────
-        # Helper: collect all UI param values
-        # ─────────────────────────────────────────────────────────────────
+                # P7 — Results
+                with gr.Group(visible=False, elem_id="page-results") as page_results_grp:
+                    results = build_results_page(lang="zh")
 
-        _param_inputs = list(params.values())
-        _param_keys   = list(params.keys())
+        # ── All page groups list (same order as ALL_PAGES) ─────────────────
+        all_page_groups = [
+            page_home,
+            page_dashboard,
+            page_model,
+            page_analysis_cfg,
+            page_intervention,
+            page_experiment,
+            page_results_grp,
+        ]
+
+        # ── Aggregated param components ────────────────────────────────────
+        # Merge all config pages into one flat dict for validator + sidebar.
+        # Keys must match core/config_bridge.py.
+        all_param_components: dict = {
+            **model_cfg.param_components,
+            **analysis_cfg.param_components,
+            **dash_settings.param_components,
+        }
+        # intervention_rules comes from gr.State, handled separately
+        param_keys   = list(all_param_components.keys())
+        param_inputs = list(all_param_components.values())
 
         def _values_to_dict(*vals) -> dict:
-            return dict(zip(_param_keys, vals))
+            return dict(zip(param_keys, vals))
 
-        # ─────────────────────────────────────────────────────────────────
-        # Run button → streaming generator
-        # ─────────────────────────────────────────────────────────────────
+        # ──────────────────────────────────────────────────────────────────
+        # Sidebar navigation event wiring
+        # ──────────────────────────────────────────────────────────────────
 
-        def _run_stream(runner: SimulationRunner, refresh_every: int, *vals):
-            ui_v = _values_to_dict(*vals)
-            ui_v["refresh_every"] = refresh_every
-            yield from runner.run_stream(ui_v, refresh_every=refresh_every)
-
-        run_btn.click(
-            fn=_run_stream,
-            inputs=[runner_state, params["refresh_every"]] + _param_inputs,
-            outputs=monitor_output_list(monitor),
+        bind_nav_events(
+            sidebar           = sidebar,
+            page_groups       = all_page_groups,
+            switch_fn         = switch_page,
+            all_param_inputs  = param_inputs,
+            param_keys        = param_keys,
+            lang_state        = lang_state,
+            runner_state      = runner_state,
         )
 
-        # ── Pause toggle ──────────────────────────────────────────────────
+        # ──────────────────────────────────────────────────────────────────
+        # Language toggle
+        # ──────────────────────────────────────────────────────────────────
+
+        def _switch_lang(new_lang: str, active_page: str, *param_vals):
+            """Hot-swap all language-sensitive labels."""
+            ui_v  = dict(zip(param_keys, param_vals))
+            items = validate_all(ui_v)
+            s_html, prog = update_status(
+                items=items, lang=new_lang, active_page=active_page
+            )
+            welcome_updates = welcome_refresh_lang(new_lang)
+            top_zh_cls = "lang-btn selected" if new_lang == "zh" else "lang-btn"
+            top_en_cls = "lang-btn selected" if new_lang == "en"  else "lang-btn"
+            return (
+                new_lang,          # lang_state
+                s_html,            # sidebar.status_html
+                prog,              # sidebar.progress_md
+                *welcome_updates,  # hero, features, hint, zh-btn, en-btn, preset-dd
+                gr.update(elem_classes=top_zh_cls),  # top lang zh button
+                gr.update(elem_classes=top_en_cls),  # top lang en button
+            )
+
+        _lang_switch_outputs = [
+            lang_state,
+            sidebar.status_html,
+            sidebar.progress_md,
+            welcome.hero_html,
+            welcome.feature_html,
+            welcome.hint_html,
+            welcome.lang_zh_btn,
+            welcome.lang_en_btn,
+            welcome.preset_dropdown,
+            lang_zh_top,
+            lang_en_top,
+        ]
+
+        lang_zh_top.click(
+            fn=lambda ap, *pv: _switch_lang("zh", ap, *pv),
+            inputs=[sidebar.active_state] + param_inputs,
+            outputs=_lang_switch_outputs,
+        )
+        lang_en_top.click(
+            fn=lambda ap, *pv: _switch_lang("en", ap, *pv),
+            inputs=[sidebar.active_state] + param_inputs,
+            outputs=_lang_switch_outputs,
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P1 Welcome — Start button → model_config
+        # ──────────────────────────────────────────────────────────────────
+
+        welcome.start_btn.click(
+            fn=lambda: switch_page("model_config"),
+            inputs=[],
+            outputs=all_page_groups,
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P1 Welcome — Preset load
+        # ──────────────────────────────────────────────────────────────────
+
+        def _load_preset(preset_key: str, lang: str):
+            """Load preset → back-fill all param components."""
+            if not preset_key:
+                return [gr.update()] * len(param_inputs) + ["", False]
+            try:
+                from config.switcher import ConfigSwitcher
+                from core.config_bridge import extract_ui_values_from_config
+                switcher = ConfigSwitcher()
+                sim_cfg, _ = switcher.resolve_theme(preset_key)
+                ui_vals = extract_ui_values_from_config(sim_cfg)
+                updates = [
+                    gr.update(value=ui_vals.get(k, DEFAULTS.get(k)))
+                    for k in param_keys
+                ]
+            except Exception:
+                updates = [gr.update()] * len(param_inputs)
+
+            status_msg, visible = on_preset_selected(preset_key, lang)
+            return updates + [status_msg, visible]
+
+        welcome.preset_dropdown.change(
+            fn=_load_preset,
+            inputs=[welcome.preset_dropdown, lang_state],
+            outputs=param_inputs + [
+                welcome.preset_status_md,
+                welcome.preset_status_md,  # visible flag handled below
+            ],
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # "Save & Continue" nav buttons across config pages
+        # ──────────────────────────────────────────────────────────────────
+
+        _page_flow = [
+            (dash_settings.save_btn,   "model_config"),
+            (model_cfg.next_btn,       "analysis_config"),
+            (model_cfg.back_btn,       "dashboard_settings"),
+            (analysis_cfg.next_btn,    "intervention"),
+            (analysis_cfg.back_btn,    "model_config"),
+            (interv.next_btn,          "experiment"),
+            (interv.back_btn,          "analysis_config"),
+        ]
+
+        for btn, target in _page_flow:
+            btn.click(
+                fn=lambda t=target: switch_page(t),
+                inputs=[],
+                outputs=all_page_groups,
+            )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P6-A Checklist: re-validate whenever experiment page is navigated to
+        # (sidebar nav button for "experiment" already calls bind_nav_events,
+        #  but we also need to refresh checklist content + snapshot)
+        # ──────────────────────────────────────────────────────────────────
+
+        def _refresh_experiment_page(lang: str, rules: list, *param_vals):
+            """Re-compute checklist and snapshot when entering P6."""
+            ui_v = dict(zip(param_keys, param_vals))
+            ui_v["intervention_rules"] = collect_rules(rules)
+            items = validate_all(ui_v)
+            checklist_update, summary_update, run_btn_update = update_checklist(
+                items, lang
+            )
+            snap_update = gr.update(value=render_snapshot(ui_v, lang))
+            return checklist_update, summary_update, run_btn_update, snap_update
+
+        # Bind to the experiment nav button click (sidebar index 5)
+        sidebar.nav_buttons[5].click(
+            fn=_refresh_experiment_page,
+            inputs=[lang_state, interv.rules_state] + param_inputs,
+            outputs=[
+                experiment.checklist_html,
+                experiment.summary_html,
+                experiment.run_btn,
+                experiment.snapshot_html,
+            ],
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P6-A Export YAML
+        # ──────────────────────────────────────────────────────────────────
+
+        def _export_yaml(*vals):
+            import yaml as _yaml
+            ui_v = _values_to_dict(*vals)
+            cfg  = build_config_from_ui(ui_v)
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+            ) as f:
+                _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
+                return f.name
+
+        experiment.export_btn.click(
+            fn=_export_yaml,
+            inputs=param_inputs,
+            outputs=[gr.File(visible=False)],
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P6-A Confirm & Run → transition to monitor + start streaming
+        # ──────────────────────────────────────────────────────────────────
+
+        def _on_confirm_run(runner: SimulationRunner):
+            """Switch UI to monitor phase."""
+            return transition_to_monitor()
+
+        experiment.run_btn.click(
+            fn=_on_confirm_run,
+            inputs=[runner_state],
+            outputs=[
+                experiment.phase_a_group,
+                experiment.phase_b_group,
+                experiment.run_btn,
+                experiment.pause_btn,
+                experiment.stop_btn,
+            ],
+        )
+
+        # Streaming simulation — chained after phase transition
+        def _run_stream(runner: SimulationRunner, lang: str, *vals):
+            ui_v = _values_to_dict(*vals)
+            yield from runner.run_stream(
+                ui_v,
+                refresh_every=int(ui_v.get("refresh_every", 10)),
+            )
+
+        experiment.run_btn.click(
+            fn=_run_stream,
+            inputs=[runner_state, lang_state] + param_inputs,
+            outputs=[
+                experiment.status_md,
+                experiment.metric_polar,   # sigma → polar metric
+                experiment.metric_step,    # mean  → step (reused slot)
+                experiment.metric_events,  # impact → events
+                experiment.metric_clusters,# events → clusters (reused)
+                experiment.metric_time,    # consensus → time (reused)
+                experiment.plot_polar,
+                experiment.plot_spatial,
+                experiment.plot_hist,
+                experiment.plot_events,
+                experiment.pause_btn,
+                experiment.stop_btn,
+            ],
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P6-B Pause / Resume toggle
+        # ──────────────────────────────────────────────────────────────────
+
         def _toggle_pause(runner: SimulationRunner):
             if runner.is_paused:
                 runner.resume()
-                return gr.update(value="⏸  Pause")
+                return gr.update(value="⏸ 暂停")
             else:
                 runner.pause()
-                return gr.update(value="▶  Resume")
+                return gr.update(value="▶ 继续")
 
-        monitor["pause_btn"].click(
+        experiment.pause_btn.click(
             fn=_toggle_pause,
             inputs=[runner_state],
-            outputs=[monitor["pause_btn"]],
-        )
-        pause_sidebar.click(
-            fn=_toggle_pause,
-            inputs=[runner_state],
-            outputs=[pause_sidebar],
+            outputs=[experiment.pause_btn],
         )
 
-        # ── Stop ──────────────────────────────────────────────────────────
+        # ──────────────────────────────────────────────────────────────────
+        # P6-B Stop
+        # ──────────────────────────────────────────────────────────────────
+
         def _stop(runner: SimulationRunner):
             runner.stop()
-            return gr.update(value="⏸  Pause", interactive=False)
+            return gr.update(interactive=False)
 
-        monitor["stop_btn"].click(
-            fn=_stop, inputs=[runner_state], outputs=[monitor["pause_btn"]])
-        stop_sidebar.click(
-            fn=_stop, inputs=[runner_state], outputs=[pause_sidebar])
-
-        # ── Reset ─────────────────────────────────────────────────────────
-        def _reset(runner: SimulationRunner):
-            runner.reset()
-            import gradio as _gr
-            return (
-                "● Ready",
-                0.0, 0.0, 0.0, 0, 0.0,
-                None, None, None, None,
-                _gr.update(value="⏸  Pause", interactive=False),
-                _gr.update(interactive=False),
-            )
-
-        reset_btn.click(
-            fn=_reset,
+        experiment.stop_btn.click(
+            fn=_stop,
             inputs=[runner_state],
-            outputs=monitor_output_list(monitor),
+            outputs=[experiment.pause_btn],
         )
 
-        # ── Analysis tab: run analysis ─────────────────────────────────────
-        def _run_analysis(runner: SimulationRunner, *vals):
-            if runner.engine is None:
-                return None, "No completed simulation. Run the simulation first.", None
+        # ──────────────────────────────────────────────────────────────────
+        # P6-B "← Reconfigure" link → back to checklist phase
+        # ──────────────────────────────────────────────────────────────────
 
-            import pandas as pd
-            from core.config_bridge import build_analysis_config_from_ui
-            from analysis.manager import run_analysis
+        # This is a gr.HTML element; we hook a hidden button pattern.
+        # For simplicity, we expose a visible button that mirrors its intent.
+        # (Full JS bridging would require a gr.Button with JS forward.)
+        _reconfigure_btn = gr.Button(
+            "← 重新配置",
+            elem_id="btn-reconfigure",
+            elem_classes="btn-secondary",
+            size="sm",
+            visible=True,
+        )
+
+        def _reconfigure(runner: SimulationRunner):
+            runner.stop()
+            return transition_to_checklist()
+
+        _reconfigure_btn.click(
+            fn=_reconfigure,
+            inputs=[runner_state],
+            outputs=[
+                experiment.phase_a_group,
+                experiment.phase_b_group,
+                experiment.pause_btn,
+                experiment.stop_btn,
+            ],
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P6-B View Results → switch page to results
+        # ──────────────────────────────────────────────────────────────────
+
+        experiment.view_results_btn.click(
+            fn=lambda: switch_page("results"),
+            inputs=[],
+            outputs=all_page_groups,
+        )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P7 Results — sub-tab switching
+        # ──────────────────────────────────────────────────────────────────
+
+        _subtab_groups = [
+            results.dynamic_group,
+            results.static_group,
+            results.features_group,
+            results.report_group,
+        ]
+
+        for btn, key in zip(results.tab_btns, _SUBTABS):
+            btn.click(
+                fn=lambda k=key: switch_subtab(k),
+                inputs=[],
+                outputs=_subtab_groups + results.tab_btns,
+            )
+
+        # ──────────────────────────────────────────────────────────────────
+        # P7 Results — Run Analysis (static dashboard + features)
+        # ──────────────────────────────────────────────────────────────────
+
+        def _run_analysis(runner: SimulationRunner, *vals):
+            import pandas as _pd
+            from analysis.manager import run_analysis as _run_analysis_mgr
+
+            if runner.engine is None:
+                return None, gr.update(value=render_features_table({}, "zh"))
 
             ui_v  = _values_to_dict(*vals)
             a_cfg = build_analysis_config_from_ui(ui_v)
 
             try:
-                result = run_analysis(runner.engine, a_cfg)
-                # Dashboard figure
-                fig = runner.get_dashboard_figure(
+                result = _run_analysis_mgr(runner.engine, a_cfg)
+                fig    = runner.get_dashboard_figure(
                     layer_idx=int(ui_v.get("layer_idx", 0))
                 )
-                # Summary dataframe
                 summary = result.pipeline_output.get("summary", {})
-                rows = [(k, f"{v:.4f}" if isinstance(v, float) else str(v))
-                        for k, v in summary.items()]
-                df = pd.DataFrame(rows, columns=["metric", "value"])
-                status_msg = (
-                    f"✓ Analysis complete — "
-                    f"{len(result.figure_paths)} figures, "
-                    f"{len(result.report_paths)} reports"
-                )
-                return fig, df, status_msg
+                feat_html = render_features_table(summary, "zh")
+                return fig, gr.update(value=feat_html)
             except Exception as exc:
-                return None, f"Analysis failed: {exc}", None
+                err_html = render_features_table({}, "zh")
+                return None, gr.update(value=err_html)
 
-        analysis["run_analysis_btn"].click(
+        results.run_analysis_btn.click(
             fn=_run_analysis,
-            inputs=[runner_state] + _param_inputs,
-            outputs=[
-                analysis["dashboard_plot"],
-                analysis["summary_df"],
-                analysis["analysis_status"],
-            ],
+            inputs=[runner_state] + param_inputs,
+            outputs=[results.dashboard_img, results.features_html],
         )
 
-        # ── Report tab: generate ──────────────────────────────────────────
-        def _generate_report(
-            runner: SimulationRunner,
-            report_fmt, report_title,
-            ai_enabled, api_key, ai_model,
-            narrative_mode, theme_name,
-            *vals,
-        ):
+        # ──────────────────────────────────────────────────────────────────
+        # P7 Results — Generate AI Report
+        # ──────────────────────────────────────────────────────────────────
+
+        def _generate_report(runner: SimulationRunner, *vals):
+            from analysis.manager import run_analysis as _run_analysis_mgr
+
             if runner.engine is None:
-                return "_No completed simulation._", None, None
+                return gr.update(value="_No simulation data._"), gr.update(visible=False)
 
-            from core.config_bridge import build_analysis_config_from_ui
-            from analysis.manager import run_analysis
-
-            ui_v = _values_to_dict(*vals)
-            ui_v.update({
-                "report_fmt":     report_fmt,
-                "report_title":   report_title,
-                "ai_enabled":     ai_enabled,
-                "api_key":        api_key,
-                "ai_model":       ai_model,
-                "narrative_mode": narrative_mode,
-                "theme_name":     theme_name,
-            })
-
+            ui_v  = _values_to_dict(*vals)
             a_cfg = build_analysis_config_from_ui(ui_v)
-            a_cfg["visual"]["enabled"] = False  # skip figures for report-only
+            a_cfg["visual"]["enabled"] = False
 
             try:
-                result = run_analysis(runner.engine, a_cfg)
+                result = _run_analysis_mgr(runner.engine, a_cfg)
                 md_path = result.report_paths.get("md", "")
-                if md_path:
-                    text = open(md_path, encoding="utf-8").read()
-                else:
-                    text = "_Report file not found._"
-
-                feat_path = result.feature_paths.get("summary_json")
-                return text, md_path or None, feat_path
+                text    = open(md_path, encoding="utf-8").read() if md_path else "_Report not found._"
+                import markdown as _md
+                html_text = f'<div id="report-preview-area">{_md.markdown(text)}</div>'
+                return gr.update(value=html_text), gr.update(visible=bool(md_path))
             except Exception as exc:
-                return f"_Error: {exc}_", None, None
+                return gr.update(value=f"_Error: {exc}_"), gr.update(visible=False)
 
-        report["generate_btn"].click(
+        results.gen_report_btn.click(
             fn=_generate_report,
-            inputs=[
-                runner_state,
-                report["report_fmt"], report["report_title"],
-                report["ai_enabled"], report["api_key"], report["ai_model"],
-                report["narrative_mode"], report["theme_name"],
-            ] + _param_inputs,
-            outputs=[
-                report["report_preview"],
-                report["download_report_btn"],
-                report["download_features_btn"],
-            ],
+            inputs=[runner_state] + param_inputs,
+            outputs=[results.report_html, results.report_download_btn],
+        )
+        results.gen_report_btn_inner.click(
+            fn=_generate_report,
+            inputs=[runner_state] + param_inputs,
+            outputs=[results.report_html, results.report_download_btn],
         )
 
-        # ── Load preset ────────────────────────────────────────────────────
-        def _load_preset(name: str):
-            if name == "(none)" or not name:
-                return [gr.update()] * len(_param_inputs)
-            try:
-                from config.switcher import ConfigSwitcher
-                from core.config_bridge import extract_ui_values_from_config
-                switcher = ConfigSwitcher()
-                sim_cfg, _ = switcher.resolve_theme(name)
-                ui_vals = extract_ui_values_from_config(sim_cfg)
-                return [gr.update(value=ui_vals.get(k, DEFAULTS.get(k)))
-                        for k in _param_keys]
-            except Exception:
-                return [gr.update()] * len(_param_inputs)
+        # ──────────────────────────────────────────────────────────────────
+        # On load: initialise preset list + run initial validation
+        # ──────────────────────────────────────────────────────────────────
 
-        params["load_preset_btn"].click(
-            fn=_load_preset,
-            inputs=[params["preset"]],
-            outputs=_param_inputs,
-        )
-
-        # ── Export YAML ────────────────────────────────────────────────────
-        def _export_yaml(*vals):
-            import tempfile, yaml as _yaml
-            ui_v = _values_to_dict(*vals)
-            cfg  = build_config_from_ui(ui_v)
-            with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
-                _yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
-                return f.name
-
-        params["export_yaml_btn"].click(
-            fn=_export_yaml,
-            inputs=_param_inputs,
-            outputs=[gr.File(visible=False)],
-        )
-
-        # ── Populate preset list on load ──────────────────────────────────
-        def _init_presets():
+        def _on_load():
+            # Populate preset dropdown
             try:
                 from config.switcher import ConfigSwitcher
                 names = ConfigSwitcher().list_themes()
-                return gr.update(choices=["(none)"] + names)
+                preset_choices = ["(none)"] + names
             except Exception:
-                return gr.update(choices=["(none)"])
+                preset_choices = ["(none)"]
 
-        demo.load(fn=_init_presets, outputs=[params["preset"]])
+            # Initial validation with defaults
+            items = validate_all(DEFAULTS)
+            s_html, prog = update_status(
+                items=items, lang="zh", active_page="home"
+            )
+            return (
+                gr.update(choices=preset_choices),
+                s_html,
+                prog,
+            )
+
+        demo.load(
+            fn=_on_load,
+            outputs=[
+                welcome.preset_dropdown,
+                sidebar.status_html,
+                sidebar.progress_md,
+            ],
+        )
 
     return demo
 
@@ -901,7 +654,8 @@ def build_app() -> gr.Blocks:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Opinion Dynamics Simulation Dashboard")
+        description="Opinion Dynamics Simulation Dashboard v2"
+    )
     parser.add_argument("--host",  default="127.0.0.1")
     parser.add_argument("--port",  type=int, default=6657)
     parser.add_argument("--share", action="store_true")

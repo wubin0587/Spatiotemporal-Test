@@ -312,7 +312,7 @@ def build_app() -> gr.Blocks:
         def _load_preset(preset_key: str, lang: str):
             """Load preset → back-fill all param components."""
             if not preset_key:
-                return [gr.update()] * len(param_inputs) + [gr.update(value="", visible=False)]
+                return [gr.update()] * len(param_inputs) + ["", False]
             try:
                 from config.switcher import ConfigSwitcher
                 from core.config_bridge import extract_ui_values_from_config
@@ -327,13 +327,14 @@ def build_app() -> gr.Blocks:
                 updates = [gr.update()] * len(param_inputs)
 
             status_msg, visible = on_preset_selected(preset_key, lang)
-            return updates + [gr.update(value=status_msg, visible=visible)]
+            return updates + [status_msg, visible]
 
         welcome.preset_dropdown.change(
             fn=_load_preset,
             inputs=[welcome.preset_dropdown, lang_state],
             outputs=param_inputs + [
                 welcome.preset_status_md,
+                welcome.preset_status_md,  # visible flag handled below
             ],
         )
 
@@ -428,17 +429,16 @@ def build_app() -> gr.Blocks:
         )
 
         # Streaming simulation — chained after phase transition
-        def _run_stream(runner: SimulationRunner, lang: str, rules: list, *vals):
+        def _run_stream(runner: SimulationRunner, lang: str, *vals):
             ui_v = _values_to_dict(*vals)
-            ui_v["intervention_rules"] = collect_rules(rules)
             yield from runner.run_stream(
                 ui_v,
                 refresh_every=int(ui_v.get("refresh_every", 10)),
             )
 
-        run_stream_event = experiment.run_btn.click(
+        experiment.run_btn.click(
             fn=_run_stream,
-            inputs=[runner_state, lang_state, interv.rules_state] + param_inputs,
+            inputs=[runner_state, lang_state] + param_inputs,
             outputs=[
                 experiment.status_md,
                 experiment.metric_polar,   # sigma → polar metric
@@ -452,20 +452,6 @@ def build_app() -> gr.Blocks:
                 experiment.plot_events,
                 experiment.pause_btn,
                 experiment.stop_btn,
-            ],
-        )
-
-        run_stream_event.then(
-            fn=lambda: (
-                gr.update(interactive=True, visible=True),
-                gr.update(interactive=True),
-                gr.update(interactive=True),
-            ),
-            inputs=[],
-            outputs=[
-                experiment.view_results_btn,
-                results.gen_report_btn,
-                results.gen_report_btn_inner,
             ],
         )
 
@@ -505,11 +491,22 @@ def build_app() -> gr.Blocks:
         # P6-B "← Reconfigure" link → back to checklist phase
         # ──────────────────────────────────────────────────────────────────
 
+        # This is a gr.HTML element; we hook a hidden button pattern.
+        # For simplicity, we expose a visible button that mirrors its intent.
+        # (Full JS bridging would require a gr.Button with JS forward.)
+        _reconfigure_btn = gr.Button(
+            "← 重新配置",
+            elem_id="btn-reconfigure",
+            elem_classes="btn-secondary",
+            size="sm",
+            visible=True,
+        )
+
         def _reconfigure(runner: SimulationRunner):
             runner.stop()
             return transition_to_checklist()
 
-        experiment.reconfigure_btn.click(
+        _reconfigure_btn.click(
             fn=_reconfigure,
             inputs=[runner_state],
             outputs=[
@@ -565,7 +562,7 @@ def build_app() -> gr.Blocks:
             try:
                 result = _run_analysis_mgr(runner.engine, a_cfg)
                 fig    = runner.get_dashboard_figure(
-                    layer_idx=int(ui_v.get("layer_idx", ui_v.get("primary_layer", 0)))
+                    layer_idx=int(ui_v.get("layer_idx", 0))
                 )
                 summary = result.pipeline_output.get("summary", {})
                 feat_html = render_features_table(summary, "zh")

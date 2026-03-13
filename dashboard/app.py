@@ -902,8 +902,8 @@ def build_app() -> gr.Blocks:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Opinion Dynamics Simulation Dashboard")
-    parser.add_argument("--host",  default="0.0.0.0")
-    parser.add_argument("--port",  type=int, default=7860)
+    parser.add_argument("--host",  default="127.0.0.1")
+    parser.add_argument("--port",  type=int, default=6657)
     parser.add_argument("--share", action="store_true")
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()

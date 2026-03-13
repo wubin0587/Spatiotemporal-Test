@@ -166,6 +166,7 @@ def _build_status_html(
     dot_colors: dict[str, str],
     active_page: str,
     lang: str,
+    nav_items: list | None = None,
 ) -> str:
     """
     Build the full HTML string for all 7 nav items with their dots.
@@ -182,10 +183,10 @@ def _build_status_html(
     lang : str
         "en" | "zh"
     """
-    lang_idx = 2 if lang == "en" else 3  # index into NAV_ITEMS tuple
+    effective_nav_items = NAV_ITEMS if nav_items is None else nav_items
 
     items_html = ""
-    for i, (page_key, icon, label_en, label_zh, has_dot, locked) in enumerate(NAV_ITEMS):
+    for i, (page_key, icon, label_en, label_zh, has_dot, locked) in enumerate(effective_nav_items):
 
         label = label_en if lang == "en" else label_zh
         is_active = (page_key == active_page)
@@ -481,19 +482,12 @@ def update_status(
             "results", "◎", "Results", "实验结果", False, False
         )
 
-    # ── Build HTML ────────────────────────────────────────────────────────
-    # Temporarily patch the global for _build_status_html to use
-    import core.sidebar as _self
-    _orig = _self.NAV_ITEMS
-    _self.NAV_ITEMS = nav_items_effective
-
     html_val = _build_status_html(
         dot_colors  = page_worst,
         active_page = active_page,
         lang        = lang,
+        nav_items   = nav_items_effective,
     )
-
-    _self.NAV_ITEMS = _orig  # restore
 
     # ── Build progress ────────────────────────────────────────────────────
     summary     = summarize(items)

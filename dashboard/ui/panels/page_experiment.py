@@ -306,6 +306,7 @@ class ExperimentComponents:
     pause_btn:        gr.Button
     stop_btn:         gr.Button
     view_results_btn: gr.Button
+    reconfigure_btn:  gr.Button
     reconfigure_html: gr.HTML
     phase_b_group:    gr.Group
     # Shared
@@ -381,6 +382,13 @@ def build_experiment_page(
 
         # Status bar
         with gr.Row(elem_id="monitor-status-bar"):
+            reconfigure_btn = gr.Button(
+                s["reconfigure_link"],
+                elem_id="btn-reconfigure",
+                elem_classes="btn-secondary",
+                size="sm",
+                visible=True,
+            )
             reconfigure_html = gr.HTML(
                 value = (
                     f'<span id="reconfigure-link" '
@@ -499,6 +507,7 @@ def build_experiment_page(
         pause_btn        = pause_btn,
         stop_btn         = stop_btn,
         view_results_btn = view_results_btn,
+        reconfigure_btn  = reconfigure_btn,
         reconfigure_html = reconfigure_html,
         phase_b_group    = phase_b_group,
         phase_state      = phase_state,

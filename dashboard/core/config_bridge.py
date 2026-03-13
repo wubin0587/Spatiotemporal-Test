@@ -106,8 +106,8 @@ def build_config_from_ui(v: dict[str, Any]) -> dict[str, Any]:
                 "backfire":     _bool(v.get("backfire"), False),
             },
             "field": {
-                "alpha":           _float(v.get("field_alpha"), 6.0),
-                "beta":            _float(v.get("field_beta"), 0.08),
+                "alpha":           _float(v.get("field_alpha", v.get("gamma_field")), 6.0),
+                "beta":            _float(v.get("field_beta", v.get("delta_decay")), 0.08),
                 "temporal_window": _float(v.get("temporal_window"), 100.0),
             },
             "topo": {
@@ -146,7 +146,7 @@ def build_config_from_ui(v: dict[str, Any]) -> dict[str, Any]:
         "distribution": {
             "type":        v.get("spatial_type", "clustered"),
             "n_clusters":  _int(v.get("n_clusters"), 4),
-            "cluster_std": _float(v.get("cluster_std"), 0.1),
+            "cluster_std": _float(v.get("cluster_spread", v.get("cluster_std")), 0.1),
         }
     }
 
@@ -166,7 +166,7 @@ def build_config_from_ui(v: dict[str, Any]) -> dict[str, Any]:
                     "intensity": {
                         "type":    "pareto",
                         "shape":   _float(v.get("exo_intensity_shape"), 2.5),
-                        "min_val": _float(v.get("exo_intensity_min"), 4.0),
+                        "min_val": _float(v.get("exo_magnitude", v.get("exo_intensity_min")), 4.0),
                     },
                     "content": {
                         "topic_dim":     n_layers,
@@ -215,7 +215,7 @@ def build_config_from_ui(v: dict[str, Any]) -> dict[str, Any]:
                         "max_sigma":  0.3,
                         "var_min":    0.001,
                         "var_max":    0.01,
-                        "size_factor": 0.1,
+                        "size_factor": _float(v.get("endo_radius"), 0.1),
                     },
                     "lifecycle": {
                         "type":      "uniform",
@@ -315,7 +315,7 @@ def build_analysis_config_from_ui(v: dict[str, Any]) -> dict[str, Any]:
         },
         "feature": {
             "enabled":        True,
-            "layer_idx":      _int(v.get("layer_idx"), 0),
+            "layer_idx":      _int(v.get("layer_idx", v.get("primary_layer")), 0),
             "include_trends": _bool(v.get("include_trends"), True),
         },
         "parser": {
@@ -431,6 +431,8 @@ def extract_ui_values_from_config(config: dict[str, Any]) -> dict[str, Any]:
         # Field
         "field_alpha":       fld.get("alpha", 6.0),
         "field_beta":        fld.get("beta", 0.08),
+        "gamma_field":       fld.get("alpha", 6.0),
+        "delta_decay":       fld.get("beta", 0.08),
         "temporal_window":   fld.get("temporal_window", 100.0),
         # Topo
         "topo_threshold":    topo.get("threshold", 0.3),
@@ -445,12 +447,14 @@ def extract_ui_values_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "spatial_type":      spatial.get("type", "clustered"),
         "n_clusters":        spatial.get("n_clusters", 4),
         "cluster_std":       spatial.get("cluster_std", 0.1),
+        "cluster_spread":    spatial.get("cluster_std", 0.1),
         # Exogenous
         "exo_enabled":       exo.get("enabled", True),
         "exo_seed":          exo.get("seed", 43),
         "exo_lambda":        _get(exo, "time_trigger", "lambda_rate") or 0.25,
         "exo_intensity_shape": _get(exo, "attributes", "intensity", "shape") or 2.5,
         "exo_intensity_min": _get(exo, "attributes", "intensity", "min_val") or 4.0,
+        "exo_magnitude":     _get(exo, "attributes", "intensity", "min_val") or 4.0,
         "exo_polarity_min":  _get(exo, "attributes", "polarity", "min") or -0.5,
         "exo_polarity_max":  _get(exo, "attributes", "polarity", "max") or 0.5,
         "exo_concentration": ",".join(str(c) for c in conc),
@@ -464,6 +468,7 @@ def extract_ui_values_from_config(config: dict[str, Any]) -> dict[str, Any]:
         "endo_cooldown":     endo.get("cooldown", 5),
         "endo_base_intensity": _get(endo, "attributes", "intensity", "base_value") or 8.0,
         "endo_scale":        _get(endo, "attributes", "intensity", "scale_factor") or 4.0,
+        "endo_radius":       _get(endo, "attributes", "diffusion", "size_factor") or 0.1,
         # Cascade
         "cascade_enabled":   cascade.get("enabled", True),
         "cascade_seed":      cascade.get("seed", 45),

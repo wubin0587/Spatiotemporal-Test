@@ -1,96 +1,230 @@
-"""Post-run analysis tab and activation helpers."""
+"""
+ui/panels/analysis_tab.py
+
+Post-run Analysis tab for the Opinion Dynamics Simulation Dashboard.
+
+Displays the four-panel simulation dashboard figure, a scrollable
+feature-summary DataFrame, a Run Analysis button, and a Download
+Figures button.
+
+Public API
+----------
+AnalysisTab
+    Dataclass holding all gr.Components for the tab.
+
+build_analysis_tab(lang) -> AnalysisTab
+    Render the tab contents in the current Gradio context.
+
+activate_analysis_tab(runner, ui_values) -> tuple
+    Run the full analysis pipeline on a completed SimulationRunner
+    and return the (figure, dataframe, status_str) tuple suitable
+    for use as the return value of the ``run_analysis_btn`` click
+    handler.
+
+    Parameters
+    ----------
+    runner     : SimulationRunner   — must have runner.engine set
+    ui_values  : dict               — flat param dict from the panel
+
+    Returns
+    -------
+    tuple[Figure | None, pd.DataFrame | None, str]
+        (dashboard_figure, summary_df, status_markdown)
+
+    Raises
+    ------
+    Does NOT raise — all exceptions are caught and returned as
+    a status string so Gradio can display them gracefully.
+"""
 
 from __future__ import annotations
 
-import json
-import tempfile
-import zipfile
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any
 
 import gradio as gr
-import pandas as pd
-
-from analysis.manager import run_analysis
-from core import renderer
 
 
-_TEXT = {
-    "en": {
-        "summary": "Summary Metrics",
-        "dashboard": "Composite Dashboard",
-        "gallery": "Analysis Figures",
-        "download": "Download Figures (.zip)",
-        "features": "features_final.json",
-        "empty": "Run simulation first, then analysis will appear here.",
-    },
-    "zh": {
-        "summary": "关键指标汇总",
-        "dashboard": "综合仪表盘",
-        "gallery": "分析图像",
-        "download": "下载图表（.zip）",
-        "features": "features_final.json",
-        "empty": "请先完成仿真，再查看分析结果。",
-    },
-}
+# ─────────────────────────────────────────────────────────────────────────────
+# AnalysisTab dataclass
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class AnalysisTab:
+    """Holds all gr.Components for the Analysis tab."""
+
+    dashboard_plot:   gr.Plot
+    summary_df:       gr.DataFrame
+    run_analysis_btn: gr.Button
+    download_btn:     gr.DownloadButton
+    analysis_status:  gr.Markdown
+
+    # ── Convenience ──────────────────────────────────────────────────────
+
+    def output_list(self) -> list:
+        """Outputs list for ``run_analysis_btn.click(outputs=...)``."""
+        return [
+            self.dashboard_plot,
+            self.summary_df,
+            self.analysis_status,
+        ]
 
 
-def build_analysis_tab(lang: str = "en") -> dict[str, gr.Component]:
-    """Build analysis tab widgets."""
-    t = _TEXT.get(lang, _TEXT["en"])
-    c: dict[str, gr.Component] = {}
+# ─────────────────────────────────────────────────────────────────────────────
+# Builder
+# ─────────────────────────────────────────────────────────────────────────────
 
-    c["summary_table"] = gr.Dataframe(label=t["summary"], interactive=False, elem_id="summary-df")
-    c["dashboard_img"] = gr.Plot(label=t["dashboard"])
-    c["figure_gallery"] = gr.Gallery(label=t["gallery"], columns=3, height=300)
-    c["download_zip_btn"] = gr.File(label=t["download"], interactive=False)
-    c["features_json_viewer"] = gr.Code(label=t["features"], language="json", interactive=False)
-    c["analysis_status"] = gr.Markdown(t["empty"])
+def build_analysis_tab(lang: str = "en") -> AnalysisTab:
+    """
+    Render the Analysis tab contents inside the current Gradio context.
 
-    return c
+    Must be called inside an active ``gr.Tab()`` or ``gr.Blocks()`` context.
 
+    Parameters
+    ----------
+    lang : {"en", "zh"}
 
-def _safe_json(data: Any) -> str:
-    return json.dumps(data, ensure_ascii=False, indent=2, default=str)
+    Returns
+    -------
+    AnalysisTab
+    """
+    _t = lambda en, zh: zh if lang == "zh" else en
 
-
-def _zip_figures(figure_paths: dict[str, str], output_dir: str | Path) -> str | None:
-    if not figure_paths:
-        return None
-    out_root = Path(output_dir)
-    out_root.mkdir(parents=True, exist_ok=True)
-    zip_path = out_root / "analysis_figures.zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for key, file_path in figure_paths.items():
-            p = Path(file_path)
-            if p.exists() and p.is_file():
-                zf.write(p, arcname=f"{key}{p.suffix}")
-    return str(zip_path)
-
-
-def activate_analysis_tab(engine: Any, analysis_config: dict[str, Any], layer_idx: int = 0) -> tuple[Any, ...]:
-    """Run analysis pipeline and return values in build_analysis_tab() order."""
-    if engine is None:
-        msg = "No simulation engine found."
-        return None, None, [], None, "{}", f"❌ {msg}"
-
-    result = run_analysis(engine, analysis_config)
-    summary = result.pipeline_output.get("summary", {})
-    summary_df = pd.DataFrame([summary]) if isinstance(summary, dict) else pd.DataFrame(summary)
-
-    dashboard_fig = renderer.render_dashboard(
-        engine=engine,
-        h_time=list(getattr(engine, "history", {}).get("time", [])),
-        h_sigma=list(getattr(engine, "history", {}).get("opinion_std", [])),
-        h_impact=list(getattr(engine, "history", {}).get("mean_impact", [])),
-        h_events=list(getattr(engine, "history", {}).get("num_events", [])),
-        layer_idx=int(layer_idx),
+    # ── Dashboard figure ──────────────────────────────────────────────────
+    dashboard_plot = gr.Plot(
+        label=_t("Simulation Dashboard", "仿真概览"),
     )
 
-    gallery_items = [(path, name) for name, path in result.figure_paths.items() if Path(path).exists()]
-    zip_path = _zip_figures(result.figure_paths, result.config.get("output", {}).get("dir", tempfile.gettempdir()))
+    # ── Feature summary table ─────────────────────────────────────────────
+    summary_df = gr.DataFrame(
+        label=_t("Feature Summary", "特征摘要"),
+        elem_id="summary-df",
+        wrap=True,
+    )
 
-    features_json = result.pipeline_output.get("final_features") or result.pipeline_output
-    status = "✅ Analysis completed" if not result.errors else f"⚠️ Analysis completed with warnings: {'; '.join(result.errors)}"
+    # ── Controls row ──────────────────────────────────────────────────────
+    with gr.Row(elem_id="analysis-controls"):
+        run_analysis_btn = gr.Button(
+            _t("▶  Run Analysis", "▶  运行分析"),
+            variant="primary",
+            size="sm",
+        )
+        download_btn = gr.DownloadButton(
+            _t("⬇  Download Figures", "⬇  下载图表"),
+            size="sm",
+        )
 
-    return summary_df, dashboard_fig, gallery_items, zip_path, _safe_json(features_json), status
+    # ── Status ────────────────────────────────────────────────────────────
+    analysis_status = gr.Markdown(
+        "",
+        elem_id="analysis-status",
+    )
+
+    return AnalysisTab(
+        dashboard_plot=dashboard_plot,
+        summary_df=summary_df,
+        run_analysis_btn=run_analysis_btn,
+        download_btn=download_btn,
+        analysis_status=analysis_status,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# activate_analysis_tab
+# ─────────────────────────────────────────────────────────────────────────────
+
+def activate_analysis_tab(runner: Any, ui_values: dict) -> tuple:
+    """
+    Run the analysis pipeline and produce all outputs for the Analysis tab.
+
+    This is the handler function to bind to ``run_analysis_btn.click``:
+
+        analysis_tab.run_analysis_btn.click(
+            fn=lambda runner, *vals: activate_analysis_tab(
+                runner, dict(zip(param_keys, vals))
+            ),
+            inputs=[runner_state] + param_inputs,
+            outputs=analysis_tab.output_list(),
+        )
+
+    Parameters
+    ----------
+    runner : SimulationRunner
+        Must have `runner.engine` set (i.e. simulation has been run).
+    ui_values : dict
+        Flat dict of all parameter values, as produced by the param panel.
+
+    Returns
+    -------
+    tuple[Figure | None, pd.DataFrame | None, str]
+        Matching ``analysis_tab.output_list()`` order:
+        (dashboard_plot, summary_df, analysis_status)
+    """
+    import pandas as pd
+
+    _no_sim_en = "⚠  No completed simulation — run the simulation first."
+    _no_sim_zh = "⚠  无已完成的仿真 — 请先运行仿真。"
+
+    if runner is None or runner.engine is None:
+        lang = ui_values.get("output_lang", "en")
+        msg  = _no_sim_zh if lang == "zh" else _no_sim_en
+        return None, None, msg
+
+    try:
+        from core.config_bridge import build_analysis_config_from_ui
+        from analysis.manager   import run_analysis
+
+        a_cfg  = build_analysis_config_from_ui(ui_values)
+        result = run_analysis(runner.engine, a_cfg)
+
+        # ── Dashboard figure ──────────────────────────────────────────────
+        layer_idx = int(ui_values.get("layer_idx", 0))
+        fig = runner.get_dashboard_figure(layer_idx=layer_idx)
+
+        # ── Feature summary DataFrame ─────────────────────────────────────
+        summary = {}
+
+        # Try pipeline_output dict first
+        if hasattr(result, "pipeline_output") and result.pipeline_output:
+            summary = result.pipeline_output.get("summary", {})
+
+        # Fallback: flatten top-level numeric fields from result
+        if not summary and hasattr(result, "__dict__"):
+            for k, v in result.__dict__.items():
+                if isinstance(v, (int, float)):
+                    summary[k] = v
+
+        if summary:
+            rows = [
+                (k, f"{v:.6f}" if isinstance(v, float) else str(v))
+                for k, v in sorted(summary.items())
+            ]
+            df = pd.DataFrame(rows, columns=["metric", "value"])
+        else:
+            df = pd.DataFrame(columns=["metric", "value"])
+
+        # ── Status message ────────────────────────────────────────────────
+        n_figs    = len(getattr(result, "figure_paths",  {}))
+        n_reports = len(getattr(result, "report_paths",  {}))
+        lang      = ui_values.get("output_lang", "en")
+
+        if lang == "zh":
+            status = (
+                f"✓ 分析完成 — {n_figs} 张图表，"
+                f"{n_reports} 份报告，"
+                f"{len(df)} 项特征"
+            )
+        else:
+            status = (
+                f"✓ Analysis complete — {n_figs} figure(s), "
+                f"{n_reports} report(s), "
+                f"{len(df)} feature(s)"
+            )
+
+        return fig, df, status
+
+    except Exception as exc:
+        lang = ui_values.get("output_lang", "en")
+        if lang == "zh":
+            return None, None, f"⚠  分析失败：{exc}"
+        return None, None, f"⚠  Analysis failed: {exc}"

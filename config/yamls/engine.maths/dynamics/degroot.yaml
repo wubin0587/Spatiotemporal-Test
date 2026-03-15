@@ -1,0 +1,4 @@
+kernel: degroot
+self_weight_base: 0.50
+gamma_mod: 0.20
+step_fraction: 1.00

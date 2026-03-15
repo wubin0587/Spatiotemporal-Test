@@ -342,6 +342,19 @@ class ConfigSwitcher:
 
     def list_choices(self, group: str) -> list[str]:
         """List all available choices for a group (yaml filenames without extension)."""
+        if "/" in group:
+            parts = group.split("/")
+            base_dir = self._root.joinpath(*parts[:-1])
+            prefix = parts[-1]
+
+            nested_dir = base_dir / prefix
+            if nested_dir.exists():
+                return sorted(p.stem for p in nested_dir.glob("*.yaml"))
+
+            if base_dir.exists():
+                return sorted(p.stem for p in base_dir.glob("*.yaml"))
+            return []
+
         group_dir = self._group_dir(group)
         if not group_dir.exists():
             return []

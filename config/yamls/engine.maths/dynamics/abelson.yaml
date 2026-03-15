@@ -1,0 +1,5 @@
+kernel: abelson
+a_base: 0.30
+alpha_mod: 0.20
+sigma_noise: 0.01
+dt: 1.00

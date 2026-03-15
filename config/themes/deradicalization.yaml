@@ -36,12 +36,13 @@ engine:
       seed: 1010
   maths:
     dynamics:
+      kernel: dw
       epsilon_base: 0.20
       mu_base: 0.30
       alpha_mod: 0.25
       beta_mod: 0.15
       backfire: false
-      backfire_strength: 0.01
+      repulsion_rate: 0.01
     field:
       alpha: 5.5
       beta: 0.07

@@ -1,0 +1,5 @@
+kernel: coda
+tau_base: 0.50
+zeta_mod: 0.10
+update_rate: 0.10
+delta_mod: 0.05

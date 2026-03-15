@@ -1,0 +1,5 @@
+kernel: sznajd
+delta_agree: 0.10
+alpha_mod: 0.15
+mu_persuade: 0.30
+beta_mod: 0.10

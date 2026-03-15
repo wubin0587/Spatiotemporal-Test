@@ -1,6 +1,12 @@
+# Default dynamics preset (single-file fallback).
+# For kernel-specific presets, prefer files under:
+#   config/yamls/engine.maths/dynamics/<kernel>.yaml
+# e.g. dw.yaml / hk.yaml / voter.yaml ...
+
+kernel: dw
 epsilon_base: 0.20
 mu_base: 0.30
 alpha_mod: 0.25
 beta_mod: 0.15
 backfire: false
-backfire_strength: 0.01
+repulsion_rate: 0.01

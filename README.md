@@ -130,6 +130,7 @@ engine:
       alpha_mod: 0.25            # event amplification
       beta_mod: 0.15
       backfire: false
+      backfire_strength: 0.01    # repulsion coefficient when backfire is enabled
     field:
       alpha: 6.0                 # impact decay rate
       beta: 0.08

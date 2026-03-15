@@ -42,6 +42,7 @@ engine:
       alpha_mod: 0.40
       beta_mod: 0.18
       backfire: false
+      backfire_strength: 0.01
     field:
       alpha: 7.0
       beta: 0.10

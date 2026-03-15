@@ -29,7 +29,6 @@ def calculate_opinion_change(X: np.ndarray, pairs: list,
       alpha_mod: 0.2        # How much impact expands trust (0.2 + 0.2*1.0 = 0.4 max)
       beta_mod: 0.1         # How much impact speeds up learning
       backfire: false       # (Optional) If true, repels when dist > epsilon & impact is high
-      backfire_strength: 0.01  # (Optional) Backfire repulsion coefficient
     ----------------------------------------------------------------
 
     Args:
@@ -50,7 +49,6 @@ def calculate_opinion_change(X: np.ndarray, pairs: list,
     alpha_mod = params.get('alpha_mod', 0.0)
     beta_mod = params.get('beta_mod', 0.0)
     enable_backfire = params.get('backfire', False)
-    backfire_strength = params.get('backfire_strength', 0.01)
 
     # Pre-calculate effective parameters for all agents
     # This vectorization avoids recalculating inside the loop
@@ -90,6 +88,6 @@ def calculate_opinion_change(X: np.ndarray, pairs: list,
                 if norm_dir > 1e-9:
                     repulsion_dir /= norm_dir
                     
-                delta_X[i] += backfire_strength * repulsion_dir * impact_vector[i]
+                delta_X[i] += 0.01 * repulsion_dir * impact_vector[i]
 
     return delta_X

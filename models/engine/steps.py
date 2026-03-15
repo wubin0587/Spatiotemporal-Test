@@ -148,6 +148,39 @@ class StepExecutor(SimulationEngine):
         
         # Step 9: Initialize impact vector (starts at zero - no events yet)
         self.impact_vector = np.zeros(self.num_agents, dtype=np.float32)
+
+        # Persistent agent-level state for FJ / CODA kernels
+        self.agent_stubborn: Optional[np.ndarray] = None  # (N,)
+        self.anchor_opinions: Optional[np.ndarray] = None  # (N, L)
+        self.action_threshold: Optional[np.ndarray] = None  # (N,)
+
+        # Initialise kernel-specific agent state
+        kernel = self.dynamics_config.get('kernel', 'dw')
+
+        if kernel == 'fj':
+            fj_cfg = self.dynamics_config.get('fj', {})
+            init_mode = fj_cfg.get('stubborn_init', 'uniform')
+            lo, hi = fj_cfg.get('stubborn_range', [0.2, 0.8])
+            if init_mode == 'polarized':
+                mask = self._rng.random(self.num_agents) > 0.5
+                self.agent_stubborn = np.where(
+                    mask,
+                    self._rng.uniform(0.7, 1.0, self.num_agents),
+                    self._rng.uniform(0.0, 0.3, self.num_agents),
+                ).astype(np.float32)
+            else:
+                self.agent_stubborn = self._rng.uniform(lo, hi, self.num_agents).astype(np.float32)
+            self.anchor_opinions = self.opinion_matrix.copy()
+
+        elif kernel == 'coda':
+            coda_cfg = self.dynamics_config.get('coda', {})
+            tau_base = coda_cfg.get('tau_base', self.dynamics_config.get('tau_base', 0.5))
+            tau_spread = coda_cfg.get('tau_spread', 0.1)
+            self.action_threshold = np.clip(
+                self._rng.normal(tau_base, tau_spread, self.num_agents),
+                0.1,
+                0.9,
+            ).astype(np.float32)
         
         # Step 10: Reset time
         self.current_time = 0.0
@@ -262,11 +295,16 @@ class StepExecutor(SimulationEngine):
         # Stage 4: Opinion Update (Layer 3: Bounded Confidence Dynamics)
         # =====================================================================
         # Calculate opinion changes based on interactions
+        # Build agent-level data bundle for stateful kernels
+        agent_data = self._build_agent_data()
+
         delta_opinions = calculate_opinion_change(
             X=self.opinion_matrix,
             pairs=interaction_pairs,
             impact_vector=self.impact_vector,
-            params=self.dynamics_config
+            params=self.dynamics_config,
+            rng=self._rng,
+            agent_data=agent_data,
         )
         
         # Apply changes (synchronous update)
@@ -401,7 +439,23 @@ class StepExecutor(SimulationEngine):
     # =========================================================================
     # Helper Methods
     # =========================================================================
-    
+
+    def _build_agent_data(self) -> dict:
+        """Pack persistent agent-level state required by the active kernel."""
+        kernel = self.dynamics_config.get('kernel', 'dw')
+        if kernel == 'fj':
+            return {
+                'stubborn': self.agent_stubborn,
+                'anchor': self.anchor_opinions.copy(),  # copy guards against accidental mutation
+            }
+        if kernel == 'coda':
+            return {'action_threshold': self.action_threshold}
+        if kernel == 'sznajd':
+            return {'adjacency': self.static_adjacency}
+        if kernel == 'degroot' and hasattr(self, 'weight_matrix'):
+            return {'weight_matrix': self.weight_matrix}
+        return {}
+
     def _build_active_events_list(self, locs: np.ndarray, times: np.ndarray,
                                    intensities: np.ndarray, contents: np.ndarray,
                                    polarities: np.ndarray) -> List[Dict[str, Any]]:

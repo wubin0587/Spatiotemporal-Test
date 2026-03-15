@@ -31,7 +31,7 @@ from .archive.vector import EventVectorArchive
 
 # Import Generators
 from .generator import EventGenerator
-from .generate.exp import ExogenousShockGenerator
+from .generate.swan import ExogenousShockGenerator
 from .generate.grid import EndogenousThresholdGenerator
 from .generate.cascade import CascadeGenerator
 from .generate.online import OnlineResonanceGenerator

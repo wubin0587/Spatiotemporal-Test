@@ -7,7 +7,7 @@ functions to:
 1. Determine the probability of an event triggering at a specific time step.
 2. Sample the lifecycle parameters (e.g., decay rate, duration) for a new event.
 
-It is designed to be called by event generators (e.g., `exp.py`).
+It is designed to be called by event generators (e.g., `swan.py`).
 """
 
 import numpy as np

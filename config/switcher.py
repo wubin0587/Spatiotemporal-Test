@@ -42,7 +42,7 @@ MOUNT_POINTS: dict[str, str | None] = {
     "engine.maths/topo":             "engine.maths.topo",
 
     # events - generator blocks
-    "events/generate.exp":           "events.generation.exogenous",
+    "events/generate.swan":           "events.generation.exogenous",
     "events/generate.grid":           "events.generation.endogenous_threshold",
     "events/generate.cascade":       "events.generation.endogenous_cascade",
     "events/generate.online":        "events.generation.online_resonance",
@@ -372,7 +372,7 @@ class ConfigSwitcher:
 
         Naming conventions supported:
           "networks.builder"      -> yamls/networks.builder/
-          "events/generate.exp"  -> yamls/events/   (file prefix = generate.exp)
+          "events/generate.swan"  -> yamls/events/   (file prefix = generate.swan)
           "engine.maths/dynamics" -> yamls/engine.maths/
         """
         if "/" in group:
@@ -396,7 +396,7 @@ class ConfigSwitcher:
             base_dir = self._root.joinpath(*parts[:-1])
             prefix   = parts[-1]
             candidates += [
-                base_dir / prefix / f"{choice}.yaml",  # e.g. events/generate.exp/uniform.yaml
+                base_dir / prefix / f"{choice}.yaml",  # e.g. events/generate.swan/uniform.yaml
                 base_dir / f"{choice}.yaml",            # fallback: events/uniform.yaml
                 base_dir / f"{prefix}.yaml",            # single-file group
             ]

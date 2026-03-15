@@ -108,9 +108,9 @@ class EventSuppressPolicy(BasePolicy):
 
     def _select_generators(self, engine: Any) -> List[Any]:
         """Return the generator objects that match ``self.source``."""
-        from models.events.generate.exp import ExogenousShockGenerator
+        from models.events.generate.swan import ExogenousShockGenerator
         from models.events.generate.cascade import CascadeGenerator
-        from models.events.generate.imp import EndogenousThresholdGenerator
+        from models.events.generate.grid import EndogenousThresholdGenerator
 
         _map = {
             "exogenous": ExogenousShockGenerator,

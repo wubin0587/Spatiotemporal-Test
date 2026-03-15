@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@File    : imp.py
+@File    : grid.py
 @Desc    : Endogenous Threshold-Based Event Generator (The "Grey Rhinos")
            
            This module generates events that emerge from the internal state of the system.

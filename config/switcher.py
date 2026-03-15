@@ -43,7 +43,7 @@ MOUNT_POINTS: dict[str, str | None] = {
 
     # events - generator blocks
     "events/generate.exp":           "events.generation.exogenous",
-    "events/generate.imp":           "events.generation.endogenous_threshold",
+    "events/generate.grid":           "events.generation.endogenous_threshold",
     "events/generate.cascade":       "events.generation.endogenous_cascade",
     "events/generate.online":        "events.generation.online_resonance",
 

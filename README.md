@@ -485,7 +485,7 @@ logging.basicConfig(level=logging.DEBUG)
 | `models/engine/facade.py` | `SimulationFacade` — public API |
 | `models/engine/steps.py` | `StepExecutor` — simulation logic |
 | `models/engine/core.py` | `SimulationEngine` — abstract interface |
-| `models/events/generate/imp.py` | Endogenous threshold generator source |
+| `models/events/generate/grid.py` | Endogenous threshold generator source |
 | `intervention/manager.py` | `InterventionManager` |
 | `intervention/trigger.py` | All trigger types + `from_config` factory |
 | `intervention/policies/base.py` | `BasePolicy` + `from_config` factory |

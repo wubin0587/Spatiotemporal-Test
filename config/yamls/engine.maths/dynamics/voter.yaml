@@ -1,0 +1,5 @@
+kernel: voter
+p_base: 0.30
+gamma_mod: 0.40
+mu_copy: 1.00
+sigma_noise: 0.02

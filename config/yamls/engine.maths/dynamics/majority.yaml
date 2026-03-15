@@ -1,0 +1,5 @@
+kernel: majority
+epsilon_majority: 0.15
+mu_conform: 0.30
+beta_mod: 0.10
+resistance: 0.00
